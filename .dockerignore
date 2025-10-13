@@ -1,0 +1,15 @@
+!package.json
+!yarn.lock
+!src/
+!prisma/
+!config.js
+!tsconfig.json
+!docker-compose*.yml
+!Dockerfile*
+!src/config/
+
+node_modules
+dist
+yarn-error.log
+.pnpm-debug.log
+.yarn
