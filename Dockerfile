@@ -1,0 +1,31 @@
+FROM node:20.11-alpine AS builder
+
+WORKDIR /app
+
+RUN apk add --no-cache python3 make g++
+
+COPY package.json yarn.lock ./
+RUN yarn install
+
+COPY . .
+
+ENV NODE_ENV=production
+
+RUN npx prisma generate
+RUN yarn build
+
+FROM node:20.11-alpine
+
+WORKDIR /app
+
+RUN apk add --no-cache python3 make g++
+
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/config.js ./config.js
+COPY package.json yarn.lock ./
+
+CMD npx prisma migrate deploy && yarn start
+
+EXPOSE 3002
