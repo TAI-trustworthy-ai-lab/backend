@@ -11,7 +11,7 @@
 
 ```sh
 git clone git@github.com:TAI-trustworthy-ai-lab/backend.git
-cd api
+cd backend
 ```
 
 ## 2. Create the `.env.local` File
