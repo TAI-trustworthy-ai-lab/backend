@@ -10,7 +10,7 @@
 ## 1. Clone the Repository
 
 ```sh
-git clone git@gitlab.com:project/api.git
+git clone git@github.com:TAI-trustworthy-ai-lab/backend.git
 cd api
 ```
 
