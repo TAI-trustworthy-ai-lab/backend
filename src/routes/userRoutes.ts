@@ -75,7 +75,7 @@ router.post('/signup', createUserController);
  *         description: Internal server error
  */
 //router.get('/login', validateLoginData, loginUserController);
-router.get('/login', loginUserController);
+router.post('/login', loginUserController);
 
 
 /**
@@ -91,7 +91,7 @@ router.get('/login', loginUserController);
  *       500:
  *         description: Internal server error
  */
-router.get('/logout', protectAuth, logoutUserController);
+router.delete('/logout', protectAuth, logoutUserController);
 
 /**
  * @swagger

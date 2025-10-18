@@ -153,7 +153,7 @@ export const updateUserController = async (req: Request, res: Response): Promise
 export const loginUserController = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
-    
+
     if (!email || !password) {
       sendErrorResponse(res, 'Email and password are required', HttpStatusCode.BAD_REQUEST);
       return;
