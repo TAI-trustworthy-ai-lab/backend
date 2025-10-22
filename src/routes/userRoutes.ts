@@ -51,7 +51,7 @@ router.post('/signup', createUserController);
 /**
  * @swagger
  * /api/user/login:
- *   get:
+ *   post:
  *     summary: Log in a user
  *     tags:
  *       - User
