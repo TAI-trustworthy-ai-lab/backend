@@ -81,10 +81,12 @@ router.post('/login', loginUserController);
 /**
  * @swagger
  * /api/user/logout:
- *   get:
+ *   delete:
  *     summary: Log out the current user
  *     tags:
  *       - User
+ *     security:
+ *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: Logout successful
