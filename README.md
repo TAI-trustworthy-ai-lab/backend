@@ -59,6 +59,7 @@ docker-compose --env-file config/.env.local up -d
 
 - API: [http://localhost:3001](http://localhost:3001)
 - Prisma Studio: [http://localhost:5555](http://localhost:5555)
+- View the API docs: [http://localhost:3001/api-docs/](http://localhost:3001/api-docs/)
 
 ## 6. Useful Commands
 
