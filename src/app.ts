@@ -11,6 +11,8 @@ import requestLogger from './middlewares/requestLogger';
 import { setupSwagger } from './utils/swagger';
 
 import userRoutes from './routes/userRoutes';
+import questionnaireRoutes from './routes/questionnaireRoutes';
+import responseRoutes from './routes/responseRoutes';
 
 const app: Application = express();
 
@@ -23,6 +25,8 @@ app.use(cookieParser());
 app.use(requestLogger);
 
 app.use('/api/user', userRoutes);
+app.use('/api/questionnaire', questionnaireRoutes);
+app.use('/api/response', responseRoutes);
 
 app.get('/', (req: Request, res: Response) => {
   res.status(200).json({ message: '🎉 Bienvenue sur l\'API !' });
