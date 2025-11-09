@@ -13,12 +13,13 @@ services:
     ports:
       - "3001:3001"
       - "5555:5555"
+      - "5556:5556"
     depends_on:
       db:
         condition: service_healthy
-    environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public
+    #environment:
+      #NODE_ENV: development
+      #DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public 
     env_file:
       - ./config/.env.local
 

@@ -55,26 +55,57 @@ router.post('/signup', createUserController);
  *     summary: Log in a user
  *     tags:
  *       - User
- *     parameters:
- *       - in: body
- *         name: credentials
- *         schema:
- *           type: object
- *           properties:
- *             email:
- *               type: string
- *             password:
- *               type: string
- *         required: true
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: user@example.com
+ *               password:
+ *                 type: string
+ *                 example: password123
  *     responses:
  *       200:
  *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     token:
+ *                       type: string
+ *                       example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *                     user:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                           example: 1
+ *                         role:
+ *                           type: string
+ *                           example: USER
+ *                 message:
+ *                   type: string
+ *                   example: Request successful
+ *       400:
+ *         description: Missing email or password
  *       401:
  *         description: Invalid credentials
+ *       404:
+ *         description: User not found
  *       500:
  *         description: Internal server error
  */
-//router.get('/login', validateLoginData, loginUserController);
 router.post('/login', loginUserController);
 
 

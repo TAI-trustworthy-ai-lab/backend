@@ -172,7 +172,17 @@ export const loginUserController = async (req: Request, res: Response): Promise<
     }
 
     const token = generateToken({ id: user.id.toString() }, '1h');
-    sendSuccessResponse(res, { token }, HttpStatusCode.OK);
+    sendSuccessResponse(
+      res,
+      {
+        token,
+        user: {
+          id: user.id,
+          role: user.role,
+        },
+      },
+      HttpStatusCode.OK
+    );
   } catch (error) {
     console.error('[loginUserController] Error:', error);
     sendErrorResponse(res, 'Internal server error', HttpStatusCode.INTERNAL_SERVER_ERROR);

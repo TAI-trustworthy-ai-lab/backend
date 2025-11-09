@@ -39,12 +39,12 @@ model Question {
 }
 
 /// (User) Chen
-///    │
-///    └───> Response #1  ←── Questionnaire "AI System Trust"
-///             │
-///             ├──> Answer #1 (Q1: Reliability = 4)
-///             ├──> Answer #2 (Q2: Privacy = 5)
-///             └──> Report (Overall Score = 4.5)
+/// │
+/// └───> Response #1  ←── Questionnaire "AI System Trust"
+/// │
+/// ├──> Answer #1 (Q1: Reliability = 4)
+/// ├──> Answer #2 (Q2: Privacy = 5)
+/// └──> Report (Overall Score = 4.5)
 model Response {
   id              Int           @id @default(autoincrement())
   userId          Int
