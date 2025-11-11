@@ -16,64 +16,143 @@ model User {
   role           UserRole   @default(USER)
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
+
   responses      Response[]
+  projects       Project[]   // A user -> multiper Project(each Project have diff Tai sort)
 }
 
-model Questionnaire {
-  id          Int        @id @default(autoincrement())
-  title       String
+model Project {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  name        String
   description String?
-  createdAt   DateTime   @default(now())
-  questions   Question[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  owner       User      @relation(fields: [userId], references: [id])
   responses   Response[]
+  taiOrders   ProjectTAIPriority[]
 }
+
+model ProjectTAIPriority {
+  id         Int          @id @default(autoincrement())
+  projectId  Int
+  indicator  TAIIndicator
+  rank       Int          // 1 = 最重要 (前端拖拉順序)
+  weight     Float?       // 選配：直接把 11 個 indicator 正規化後存起來
+
+  project    Project      @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, indicator]) // 每個 project 對每個 indicator 只出現一次
+}
+
+// groups[i].versions[0].id
+//問卷階段，例如：建模前 / 建模中 / 建模後
+model QuestionnaireGroup {
+  id          Int                   @id @default(autoincrement())
+  name        String                @unique    // "建模前" / "建模中" / "建模後"
+  description String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  versions    QuestionnaireVersion[]
+}
+
+//建模中 v1、建模中 v2、建模前 v1 ...
+model QuestionnaireVersion {
+  id            Int                 @id @default(autoincrement())
+  groupId       Int
+  versionNumber Int                 // 1,2,3,...
+  title         String
+  description   String?
+  createdAt     DateTime            @default(now())
+  isActive      Boolean             @default(true)
+
+  group         QuestionnaireGroup  @relation(fields: [groupId], references: [id])
+  questions     Question[]
+  responses     Response[]
+}
+
 
 model Question {
-  id              Int           @id @default(autoincrement())
-  questionnaireId Int
-  text            String
-  category        TAIIndicator
-  order           Int
-  answers         Answer[]
-  questionnaire   Questionnaire @relation(fields: [questionnaireId], references: [id])
+  id        Int                  @id @default(autoincrement())
+  versionId Int
+  text      String
+  category  TAIIndicator
+  order     Int
+  type      QuestionType         @default(SCALE)  // 
+  required  Boolean              @default(true)
+
+  version   QuestionnaireVersion @relation(fields: [versionId], references: [id])
+  options   QuestionOption[]
+  answers   Answer[]
 }
 
-/// (User) Chen
-/// │
-/// └───> Response #1  ←── Questionnaire "AI System Trust"
-/// │
-/// ├──> Answer #1 (Q1: Reliability = 4)
-/// ├──> Answer #2 (Q2: Privacy = 5)
-/// └──> Report (Overall Score = 4.5)
+model QuestionOption {
+  id         Int      @id @default(autoincrement())
+  questionId Int
+  text       String
+  value      Int?     // 選配：如果這個選項要對應一個 scoring 值
+  order      Int
+
+  question   Question @relation(fields: [questionId], references: [id])
+  answers    Answer[]
+}
+
+
 model Response {
-  id              Int           @id @default(autoincrement())
-  userId          Int
-  questionnaireId Int
-  submittedAt     DateTime      @default(now())
-  answers         Answer[]
-  report          Report?
-  questionnaire   Questionnaire @relation(fields: [questionnaireId], references: [id])
-  user            User          @relation(fields: [userId], references: [id])
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  projectId   Int       // 新增：這次作答是屬於哪個 project
+  versionId   Int
+  submittedAt DateTime  @default(now())
+  label       String?   // 選配：例如「第一次評估」、「v1.0 release 前」
+
+  user        User                 @relation(fields: [userId], references: [id])
+  project     Project              @relation(fields: [projectId], references: [id])
+  version     QuestionnaireVersion @relation(fields: [versionId], references: [id])
+  answers     Answer[]
+  report      Report?
 }
 
 model Answer {
   id         Int      @id @default(autoincrement())
   responseId Int
   questionId Int
-  value      Int
-  question   Question @relation(fields: [questionId], references: [id])
-  response   Response @relation(fields: [responseId], references: [id])
+  optionId   Int?      // 單選、多選時綁哪個選項
+  value      Int?      // 數值答案（Likert、分數）
+  textValue  String?   // 問答題文字
+  createdAt  DateTime  @default(now())
+ 
+  response   Response        @relation(fields: [responseId], references: [id])
+  question   Question        @relation(fields: [questionId], references: [id])
+  option     QuestionOption? @relation(fields: [optionId], references: [id])
 }
 
+
 model Report {
-  id           Int      @id @default(autoincrement())
-  responseId   Int      @unique
-  overallScore Float
-  generatedAt  DateTime @default(now())
-  analysisText String?
-  radarData    Json
-  response     Response @relation(fields: [responseId], references: [id])
+  id                 Int      @id @default(autoincrement())
+  responseId         Int      @unique
+  overallScore       Float
+  generatedAt        DateTime @default(now())
+  analysisText       String?  // LLM 生成的一大片文字
+  radarData          Json     // 各 TAI 的分數
+  taiWeightSnapshot  Json?    // 選配：紀錄當下 Project 的權重 {"ACCURACY":0.2,...}
+  llmMeta            Json?    // 選配：prompt、model name 等
+
+  response           Response @relation(fields: [responseId], references: [id])
+  images             ReportImage[]
 }
+
+model ReportImage {
+  id        Int      @id @default(autoincrement())
+  reportId  Int
+  url       String   // 圖片的 URL
+  caption   String?
+  createdAt DateTime @default(now())
+
+  report    Report   @relation(fields: [reportId], references: [id])
+}
+
 
 enum UserRole {
   USER
@@ -93,4 +172,11 @@ enum TAIIndicator {
   PRIVACY
   FAIRNESS
   SECURITY
+}
+
+enum QuestionType {
+  SCALE          // Likert 1~5 這種
+  SINGLE_CHOICE  // 單選
+  MULTIPLE_CHOICE// 多選
+  TEXT           // 問答
 }
