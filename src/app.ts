@@ -14,6 +14,7 @@ import userRoutes from './routes/userRoutes';
 import questionnaireRoutes from './routes/questionnaireRoutes';
 import responseRoutes from './routes/responseRoutes';
 import projectRoutes from './routes/projectRoutes';
+import reportRoutes from './routes/reportRoutes';
 
 const app: Application = express();
 
@@ -29,6 +30,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/questionnaire', questionnaireRoutes);
 app.use('/api/response', responseRoutes);
 app.use('/api/project', projectRoutes);
+app.use('/api/report', reportRoutes);
 
 app.get('/', (req: Request, res: Response) => {
   res.status(200).json({ message: '🎉 Bienvenue sur l\'API !' });

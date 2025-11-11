@@ -9,6 +9,13 @@ export const createProject = async (data: {
   name: string;
   description?: string;
 }) => {
+  // 檢查上限
+  const count = await prisma.project.count({ where: { userId: data.userId } });
+  if (count >= 5) {
+    throw new Error('You can only have up to 5 projects. Please delete an old one first.');
+  }
+
+  // 創建新專案
   return prisma.project.create({
     data: {
       userId: data.userId,
@@ -39,6 +46,15 @@ export const getProjectById = async (id: number) => {
   });
 };
 
+export const getProjectByName = async (userId: number, name: string) => {
+  const project = await prisma.project.findFirst({
+    where: { userId, name },
+    include: { taiOrders: true },
+  });
+  if (!project) throw new Error('Project not found');
+  return project;
+};
+
 /**
  * 查詢 Project 的 TAI 排序
  */
@@ -67,4 +83,15 @@ export const updateProjectTAI = async (
     })),
   });
   return { message: 'TAI priorities updated successfully', count: created.count };
+};
+
+// projectService.ts
+export const deleteProject = async (id: number) => {
+  // 若希望連 responses 一起刪，可開 transaction
+  return prisma.$transaction(async (tx) => {
+    await tx.projectTAIPriority.deleteMany({ where: { projectId: id } });
+    await tx.response.deleteMany({ where: { projectId: id } });
+    const deleted = await tx.project.delete({ where: { id } });
+    return { message: `Project '${deleted.name}' deleted successfully`, deletedId: id };
+  });
 };

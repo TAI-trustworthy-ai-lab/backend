@@ -191,3 +191,95 @@ export const getResponsesByVersionId = async (versionId: number) => {
     },
   });
 };
+
+export const getResponseById = async (id: number) => {
+  return prisma.response.findUnique({
+    where: { id },
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+      project: { select: { id: true, name: true } },
+      version: { select: { id: true, title: true } },
+      answers: {
+        include: {
+          question: { select: { id: true, text: true, category: true, type: true } },
+          option: { select: { id: true, text: true, value: true } },
+        },
+      },
+    },
+  });
+};
+
+/**
+ * 取得某使用者的所有作答
+ */
+export const getResponsesByUserId = async (userId: number) => {
+  return prisma.response.findMany({
+    where: { userId },
+    orderBy: { submittedAt: 'desc' },
+    include: {
+      project: { select: { id: true, name: true } },
+      version: { select: { id: true, title: true } },
+    },
+  });
+};
+
+/**
+ * 取得某專案的所有作答
+ */
+export const getResponsesByProjectId = async (projectId: number) => {
+  return prisma.response.findMany({
+    where: { projectId },
+    orderBy: { submittedAt: 'desc' },
+    include: {
+      user: { select: { id: true, name: true } },
+      version: { select: { id: true, title: true } },
+    },
+  });
+};
+
+/**
+ * 更新作答內容（答案）
+ */
+export const updateResponse = async (
+  id: number,
+  answers: {
+    questionId: number;
+    value?: number;
+    textValue?: string;
+    optionId?: number;
+  }[]
+) => {
+  // 先刪除舊的 answers，再重新建立
+  await prisma.answer.deleteMany({ where: { responseId: id } });
+
+  // 重新寫入新答案
+  const updated = await prisma.response.update({
+    where: { id },
+    data: {
+      answers: { create: answers },
+      submittedAt: new Date(),
+    },
+    include: {
+      user: true,
+      project: true,
+      version: true,
+      answers: true,
+    },
+  });
+
+  return updated;
+};
+
+/**
+ * 刪除一份作答
+ */
+export const deleteResponse = async (id: number) => {
+  return prisma.response.delete({
+    where: { id },
+    include: {
+      user: true,
+      project: true,
+      version: true,
+    },
+  });
+};

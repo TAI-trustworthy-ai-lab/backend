@@ -52,3 +52,112 @@ export const getResponsesByVersionId = async (req: Request, res: Response) => {
     );
   }
 };
+
+/**
+ * get a single response (with answers + question details)
+ * 取得單筆完整作答，含題目資訊（user/project/version/answers）
+ * path param: :id
+ */
+export const getResponseById = async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id);
+
+    const responseRecord = await responseService.getResponseById(id);
+
+    if (!responseRecord) {
+      return res.status(404).json({
+        success: false,
+        message: 'Response not found',
+      });
+    }
+
+    return sendSuccessResponse(res, responseRecord);
+  } catch (error) {
+    return sendErrorResponse(
+      res,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+};
+
+/**
+ * get all responses for a specific user
+ * 取得指定使用者的所有作答
+ * path param: :userId
+ */
+export const getResponsesByUserId = async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    const responses = await responseService.getResponsesByUserId(userId);
+    return sendSuccessResponse(res, responses);
+  } catch (error) {
+    return sendErrorResponse(
+      res,
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+};
+
+/**
+ * get all responses for a specific project
+ * 取得指定專案的所有作答
+ * path param: :projectId
+ */
+export const getResponsesByProjectId = async (req: Request, res: Response) => {
+  try {
+    const projectId = parseInt(req.params.projectId);
+    const responses = await responseService.getResponsesByProjectId(projectId);
+    return sendSuccessResponse(res, responses);
+  } catch (error) {
+    return sendErrorResponse(
+      res,
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+};
+
+/**
+ * update an existing response (update answers)
+ * 更新作答的內容
+ * path param: :id
+ * body: { answers: [{ questionId, value, textValue, optionId }] }
+ */
+export const updateResponse = async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { answers } = req.body;
+
+    if (!answers || !Array.isArray(answers) || answers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'answers 陣列不可為空',
+      });
+    }
+
+    const updated = await responseService.updateResponse(id, answers);
+    return sendSuccessResponse(res, updated);
+  } catch (error) {
+    return sendErrorResponse(
+      res,
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+};
+
+/**
+ * delete a response by ID
+ * 刪除一份作答
+ * path param: :id
+ */
+export const deleteResponse = async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id);
+    const deleted = await responseService.deleteResponse(id);
+    return sendSuccessResponse(res, deleted);
+  } catch (error) {
+    return sendErrorResponse(
+      res,
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+};

@@ -40,6 +40,17 @@ export const getProjectById = async (req: Request, res: Response) => {
   }
 };
 
+export const getProjectByName = async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    const name = decodeURIComponent(req.params.name);
+    const project = await projectService.getProjectByName(userId, name);
+    return sendSuccessResponse(res, project);
+  } catch (error) {
+    return sendErrorResponse(res, error instanceof Error ? error.message : String(error));
+  }
+};
+
 /**
  * 查 Project 的 TAI 排序
  */
@@ -67,3 +78,14 @@ export const updateProjectTAI = async (req: Request, res: Response) => {
     return sendErrorResponse(res, error instanceof Error ? error.message : String(error));
   }
 };
+
+export const deleteProject = async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id);
+    const result = await projectService.deleteProject(id);
+    return sendSuccessResponse(res, result);
+  } catch (error) {
+    return sendErrorResponse(res, error instanceof Error ? error.message : String(error));
+  }
+};
+

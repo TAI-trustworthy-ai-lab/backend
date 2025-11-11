@@ -43,6 +43,29 @@
  *       200:
  *         description: List of user's projects
  *
+ * /api/project/user/{userId}/name/{name}:
+ *   get:
+ *     summary: Get a project by its name (for a specific user)
+ *     tags: [Project]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *       - in: path
+ *         name: name
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "AI 系統建模前評估"
+ *     responses:
+ *       200:
+ *         description: Project detail
+ *       404:
+ *         description: Project not found
+ *
  * /api/project/{id}:
  *   get:
  *     summary: Get a single project by ID
@@ -57,6 +80,21 @@
  *     responses:
  *       200:
  *         description: Project detail
+ *   delete:
+ *     summary: Delete a project by ID
+ *     tags: [Project]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     responses:
+ *       200:
+ *         description: Project deleted successfully
+ *       404:
+ *         description: Project not found
  *
  * /api/project/{id}/tai-priority:
  *   get:
@@ -103,9 +141,12 @@ import * as projectController from '../controllers/projectController';
 
 const router = express.Router();
 
+// ⚠️ 順序很重要：先放 /user/:userId/name/:name，避免被 /:id 攔截
 router.post('/', projectController.createProject);
 router.get('/user/:userId', projectController.getProjectsByUser);
+router.get('/user/:userId/name/:name', projectController.getProjectByName);
 router.get('/:id', projectController.getProjectById);
+router.delete('/:id', projectController.deleteProject);
 router.get('/:id/tai-priority', projectController.getProjectTAI);
 router.put('/:id/tai-priority', projectController.updateProjectTAI);
 
