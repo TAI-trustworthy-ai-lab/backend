@@ -141,7 +141,6 @@ import * as projectController from '../controllers/projectController';
 
 const router = express.Router();
 
-// ⚠️ 順序很重要：先放 /user/:userId/name/:name，避免被 /:id 攔截
 router.post('/', projectController.createProject);
 router.get('/user/:userId', projectController.getProjectsByUser);
 router.get('/user/:userId/name/:name', projectController.getProjectByName);
