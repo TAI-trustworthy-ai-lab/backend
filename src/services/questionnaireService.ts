@@ -11,21 +11,19 @@ interface CreateQuestionnairePayload {
     text: string;
     category: string; // TAIIndicator
     order: number;
+    type?: string; // 新增題型
+    options?: {
+      text: string;
+      value?: number;
+      order: number;
+    }[];
   }[];
 }
 
-/**
- * createQuestionnaire:
- * if no existing group, create one
- * if existing, create new version under that group
- * 建立一個新的問卷版本：
- * - 如果 group 不存在就建立 (ex: 第一次建立 "建模前")
- * - 如果已存在，就在該 group 底下新增下一版 versionNumber
- */
 export const createQuestionnaire = async (data: CreateQuestionnairePayload) => {
   const { groupName, title, description, questions } = data;
 
-  // 找或建 group
+  // 先找或建立 group
   let group = await prisma.questionnaireGroup.findUnique({
     where: { name: groupName },
   });
@@ -39,8 +37,7 @@ export const createQuestionnaire = async (data: CreateQuestionnairePayload) => {
     });
   }
 
-  // find latest version
-  // 找目前最大版號
+  // 找目前該 group 的最大 versionNumber
   const lastVersion = await prisma.questionnaireVersion.findFirst({
     where: { groupId: group.id },
     orderBy: { versionNumber: 'desc' },
@@ -48,8 +45,7 @@ export const createQuestionnaire = async (data: CreateQuestionnairePayload) => {
 
   const nextVersionNumber = (lastVersion?.versionNumber ?? 0) + 1;
 
-  // create new version with questions
-  // 建立新版本 + 題目
+  // 建立新 version 與對應題目 + 選項
   const newVersion = await prisma.questionnaireVersion.create({
     data: {
       groupId: group.id,
@@ -57,16 +53,42 @@ export const createQuestionnaire = async (data: CreateQuestionnairePayload) => {
       title,
       description,
       questions: {
-        create: questions.map((q) => ({
-          text: q.text,
-          category: q.category as any,
-          order: q.order,
-        })),
+        create: questions.map((q) => {
+          const type = (q.type ?? 'SCALE').toUpperCase();
+
+          // 防呆邏輯
+          if ((type === 'SINGLE_CHOICE' || type === 'MULTIPLE_CHOICE') && !q.options) {
+            throw new Error(`Question "${q.text}" requires options for type ${type}`);
+          }
+          if (type === 'TEXT' && q.options && q.options.length > 0) {
+            throw new Error(`Question "${q.text}" should not have options for TEXT type`);
+          }
+
+          // 建立題目與選項
+          return {
+            text: q.text,
+            category: q.category as any,
+            order: q.order,
+            type: type as any,
+            options:
+              q.options && q.options.length > 0
+                ? {
+                    create: q.options.map((opt) => ({
+                      text: opt.text,
+                      value: opt.value,
+                      order: opt.order,
+                    })),
+                  }
+                : undefined,
+          };
+        }),
       },
     },
     include: {
       group: true,
-      questions: true,
+      questions: {
+        include: { options: true },
+      },
     },
   });
 
@@ -82,7 +104,9 @@ export const getQuestionnaireVersionById = async (id: number) => {
     where: { id },
     include: {
       group: true,
-      questions: true,
+      questions: {
+        include: { options: true }, 
+      },
     },
   });
 };
@@ -101,4 +125,59 @@ export const getLatestQuestionnaireGroups = async () => {
       },
     },
   });
+};
+
+// 查詢參數型別
+interface ListQuestionnairesParams {
+  groupName?: string;        // 依 group 名稱過濾（建模前/建模中/建模後）
+  isActive?: boolean;        // 過濾版本啟用狀態
+  includeQuestions?: boolean;// 是否包含題目與選項
+  page?: number;             // 第幾頁（預設 1）
+  pageSize?: number;         // 每頁筆數（預設 20）
+}
+
+/**
+ * 取得所有問卷版本（可選擇是否帶題目與選項），支援篩選與分頁
+ */
+export const getAllQuestionnaireVersions = async (params: ListQuestionnairesParams) => {
+  const {
+    groupName,
+    isActive,
+    includeQuestions = true,
+    page = 1,
+    pageSize = 20,
+  } = params;
+
+  const where: any = {};
+  if (typeof isActive === 'boolean') where.isActive = isActive;
+  if (groupName) where.group = { name: groupName };
+
+  const skip = (Math.max(page, 1) - 1) * Math.max(pageSize, 1);
+  const take = Math.max(pageSize, 1);
+
+  const [total, items] = await Promise.all([
+    prisma.questionnaireVersion.count({ where }),
+    prisma.questionnaireVersion.findMany({
+      where,
+      orderBy: [{ groupId: 'asc' }, { versionNumber: 'desc' }],
+      include: {
+        group: true,
+        questions: includeQuestions
+          ? { orderBy: { order: 'asc' }, include: { options: true } }
+          : false,
+      },
+      skip,
+      take,
+    }),
+  ]);
+
+  return {
+    items,
+    pagination: {
+      page,
+      pageSize: take,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / take)),
+    },
+  };
 };

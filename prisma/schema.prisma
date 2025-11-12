@@ -98,7 +98,6 @@ model QuestionOption {
   answers    Answer[]
 }
 
-
 model Response {
   id          Int       @id @default(autoincrement())
   userId      Int

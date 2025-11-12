@@ -1,11 +1,3 @@
-// src/routes/questionnaireRoutes.ts
-
-// questionnaire api routes
-// POST /api/questionnaire → 建立新問卷版本
-// GET /api/questionnaire/:id → 取得某版本（舊路徑，兼容用）
-// GET /api/questionnaire-group/latest → 取得三個階段最新版本的 id
-// GET /api/questionnaire-version/:id → 取得該版本的問卷內容
-
 /**
  * @openapi
  * tags:
@@ -25,37 +17,107 @@
  *             properties:
  *               groupName:
  *                 type: string
- *                 example: 建模中
+ *                 example: 建模前
  *               title:
  *                 type: string
+ *                 example: 建模前 問卷 v1
  *               description:
  *                 type: string
+ *                 example: 評估 AI 系統在建模前階段的信任指標
  *               questions:
  *                 type: array
  *                 items:
  *                   type: object
  *                   properties:
- *                     text:
- *                       type: string
+ *                     text: { type: string, example: 系統是否具備輸入驗證機制？ }
  *                     category:
  *                       type: string
+ *                       enum: [ACCURACY, RELIABILITY, SAFETY, RESILIENCE, TRANSPARENCY, ACCOUNTABILITY, EXPLAINABILITY, AUTONOMY, PRIVACY, FAIRNESS, SECURITY]
  *                       example: RELIABILITY
- *                     order:
- *                       type: integer
+ *                     order: { type: integer, example: 2 }
+ *                     type:
+ *                       type: string
+ *                       enum: [SCALE, SINGLE_CHOICE, MULTIPLE_CHOICE, TEXT]
+ *                       example: SINGLE_CHOICE
+ *                     options:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           text:  { type: string, example: 是 }
+ *                           value: { type: number, example: 1 }
+ *                           order: { type: integer, example: 1 }
  *     responses:
  *       200:
- *         description: Questionnaire version created
+ *         description: Questionnaire version created successfully
+ *
+ * /api/questionnaire/all:
+ *   get:
+ *     summary: List all questionnaire versions (with optional filters & pagination)
+ *     tags: [Questionnaire]
+ *     parameters:
+ *       - in: query
+ *         name: groupName
+ *         schema: { type: string, example: 建模中 }
+ *         description: Filter by questionnaire group name
+ *       - in: query
+ *         name: isActive
+ *         schema: { type: boolean, example: true }
+ *         description: Filter by version active status
+ *       - in: query
+ *         name: includeQuestions
+ *         schema: { type: boolean, example: true }
+ *         description: Whether to include questions & options
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, example: 1 }
+ *         description: Page number (1-based)
+ *       - in: query
+ *         name: pageSize
+ *         schema: { type: integer, example: 20 }
+ *         description: Page size
+ *     responses:
+ *       200:
+ *         description: List of questionnaire versions
+ *         content:
+ *           application/json:
+ *             example:
+ *               status: success
+ *               data:
+ *                 items:
+ *                   - id: 4
+ *                     versionNumber: 2
+ *                     isActive: true
+ *                     title: 建模前 問卷 v2
+ *                     group: { id: 1, name: 建模前 }
+ *                     questions:
+ *                       - id: 11
+ *                         text: 模型是否定期更新？
+ *                         type: SINGLE_CHOICE
+ *                         category: ACCOUNTABILITY
+ *                         order: 1
+ *                         options:
+ *                           - id: 21
+ *                             text: 是
+ *                             value: 1
+ *                           - id: 22
+ *                             text: 否
+ *                             value: 0
+ *                 pagination:
+ *                   page: 1
+ *                   pageSize: 20
+ *                   total: 7
+ *                   totalPages: 1
  *
  * /api/questionnaire/{id}:
  *   get:
- *     summary: Get questionnaire version by ID
+ *     summary: Get questionnaire version by legacy ID (兼容舊路徑)
  *     tags: [Questionnaire]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema:
- *           type: integer
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Questionnaire version details
@@ -70,14 +132,13 @@
  *
  * /api/questionnaire/version/{id}:
  *   get:
- *     summary: Get questionnaire version detail by ID
+ *     summary: Get questionnaire version detail by ID (包含題目與選項)
  *     tags: [Questionnaire]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema:
- *           type: integer
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Questionnaire version detail
@@ -88,26 +149,19 @@ import * as questionnaireController from '../controllers/questionnaireController
 
 const router = express.Router();
 
-// create questionnaire version
-// 建立新版本
+// POST /api/questionnaire → 建立新問卷版本
 router.post('/', questionnaireController.createQuestionnaire);
 
-// get questionnaire by its ID
-// 兼容舊路徑：/api/questionnaire/:id
+// 先宣告 /all，避免被 /:id 吃掉
+router.get('/all', questionnaireController.getAllQuestionnaires);
+
+// GET /api/questionnaire/group/latest → 取得三個階段最新版本
+router.get('/group/latest', questionnaireController.getLatestQuestionnaireGroups);
+
+// GET /api/questionnaire/version/:id → 明確用 version id 取得問卷內容
+router.get('/version/:id', questionnaireController.getQuestionnaireVersionById);
+
+// GET /api/questionnaire/:id → 舊版路徑（兼容用）
 router.get('/:id', questionnaireController.getQuestionnaireById);
-
-// get all questionnaire groups with their latest version
-// 取得所有 Group + 最新版本 → login 後「建模前/中/後 選擇頁」用
-router.get(
-  '/group/latest',
-  questionnaireController.getLatestQuestionnaireGroups,
-);
-
-// 明確用 version id 取得問卷內容
-// /api/questionnaire/version/:id
-router.get(
-  '/version/:id',
-  questionnaireController.getQuestionnaireVersionById,
-);
 
 export default router;

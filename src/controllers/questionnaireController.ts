@@ -67,3 +67,33 @@ export const getQuestionnaireVersionById = async (req: Request, res: Response) =
     );
   }
 };
+
+// GET /api/questionnaire/all
+export const getAllQuestionnaires = async (req: Request, res: Response) => {
+  try {
+    const {
+      groupName,
+      isActive,
+      includeQuestions,
+      page,
+      pageSize,
+    } = req.query as Record<string, string | undefined>;
+
+    const data = await questionnaireService.getAllQuestionnaireVersions({
+      groupName: groupName,
+      isActive: typeof isActive === 'string' ? isActive === 'true' : undefined,
+      includeQuestions:
+        typeof includeQuestions === 'string' ? includeQuestions === 'true' : true,
+      page: page ? parseInt(page) : 1,
+      pageSize: pageSize ? parseInt(pageSize) : 20,
+    });
+
+    return sendSuccessResponse(res, data);
+  } catch (error) {
+    console.error('Prisma Error in getAllQuestionnaires:', error);
+    return sendErrorResponse(
+      res,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+};
