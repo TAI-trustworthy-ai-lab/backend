@@ -97,3 +97,61 @@ export const getAllQuestionnaires = async (req: Request, res: Response) => {
     );
   }
 };
+
+// PATCH /api/questionnaire/:id
+export const updateQuestionnaire = async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { title, description, isActive } = req.body;
+    const updated = await questionnaireService.updateQuestionnaireById(id, {
+      title,
+      description,
+      isActive,
+    });
+    return sendSuccessResponse(res, updated);
+  } catch (error) {
+    console.error('Prisma Error in updateQuestionnaire:', error);
+    return sendErrorResponse(
+      res,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+};
+
+// DELETE /api/questionnaire/:id
+export const deleteQuestionnaire = async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id);
+    const deleted = await questionnaireService.deleteQuestionnaireById(id);
+    return sendSuccessResponse(res, {
+      message: `Questionnaire version ${id} deleted successfully`,
+      deleted,
+    });
+  } catch (error) {
+    console.error('Prisma Error in deleteQuestionnaire:', error);
+    return sendErrorResponse(
+      res,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+};
+
+// PUT /api/questionnaire/:id/duplicate
+export const duplicateQuestionnaire = async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { title, description } = req.body;
+    const duplicated = await questionnaireService.duplicateQuestionnaireById(id, {
+      title,
+      description,
+    });
+    return sendSuccessResponse(res, duplicated);
+  } catch (error) {
+    console.error('Prisma Error in duplicateQuestionnaire:', error);
+    return sendErrorResponse(
+      res,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+};
+

@@ -51,6 +51,7 @@
  *       200:
  *         description: Questionnaire version created successfully
  *
+ *
  * /api/questionnaire/all:
  *   get:
  *     summary: List all questionnaire versions (with optional filters & pagination)
@@ -121,6 +122,46 @@
  *     responses:
  *       200:
  *         description: Questionnaire version details
+ * 
+ *   patch:
+ *     summary: Update questionnaire version (title, description, isActive)
+ *     tags: [Questionnaire]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: 建模前 問卷 v2（修正版）
+ *               description:
+ *                 type: string
+ *                 example: 更新題目描述與權重設定
+ *               isActive:
+ *                 type: boolean
+ *                 example: false
+ *     responses:
+ *       200:
+ *         description: Questionnaire version updated successfully
+ *
+ *   delete:
+ *     summary: Delete questionnaire version by ID (包含題目與選項)
+ *     tags: [Questionnaire]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Questionnaire version deleted successfully
  *
  * /api/questionnaire/group/latest:
  *   get:
@@ -142,7 +183,50 @@
  *     responses:
  *       200:
  *         description: Questionnaire version detail
+ * 
+ * /api/questionnaire/{id}/duplicate:
+ *   put:
+ *     summary: Duplicate questionnaire version (copy all questions and options)
+ *     tags: [Questionnaire]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: 建模前 問卷 v3（副本）
+ *               description:
+ *                 type: string
+ *                 example: 從 v2 複製而來的問卷版本
+ *     responses:
+ *       200:
+ *         description: Questionnaire version duplicated successfully
+ *         content:
+ *           application/json:
+ *             example:
+ *               status: success
+ *               data:
+ *                 id: 5
+ *                 title: 建模前 問卷 v3（副本）
+ *                 versionNumber: 3
+ *                 group: { id: 1, name: 建模前 }
+ *                 questions:
+ *                   - id: 31
+ *                     text: 系統是否具備輸入驗證機制？
+ *                     type: SINGLE_CHOICE
+ *                     options:
+ *                       - text: 是
+ *                       - text: 否
  */
+
 
 import express from 'express';
 import * as questionnaireController from '../controllers/questionnaireController';
@@ -152,7 +236,16 @@ const router = express.Router();
 // POST /api/questionnaire → 建立新問卷版本
 router.post('/', questionnaireController.createQuestionnaire);
 
-// 先宣告 /all，避免被 /:id 吃掉
+// PATCH /api/questionnaire/:id → 修改標題、描述、isActive
+router.patch('/:id', questionnaireController.updateQuestionnaire);
+
+// DELETE /api/questionnaire/:id → 刪除問卷版本
+router.delete('/:id', questionnaireController.deleteQuestionnaire);
+
+// PUT /api/questionnaire/:id/duplicate → 複製問卷版本
+router.put('/:id/duplicate', questionnaireController.duplicateQuestionnaire);
+
+// GET /api/questionnaire/all → 查詢所有問卷
 router.get('/all', questionnaireController.getAllQuestionnaires);
 
 // GET /api/questionnaire/group/latest → 取得三個階段最新版本
@@ -163,5 +256,7 @@ router.get('/version/:id', questionnaireController.getQuestionnaireVersionById);
 
 // GET /api/questionnaire/:id → 舊版路徑（兼容用）
 router.get('/:id', questionnaireController.getQuestionnaireById);
+
+
 
 export default router;

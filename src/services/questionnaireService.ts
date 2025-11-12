@@ -181,3 +181,110 @@ export const getAllQuestionnaireVersions = async (params: ListQuestionnairesPara
     },
   };
 };
+
+/**
+ * 刪除指定問卷版本（連帶刪除底下題目與選項）
+ */
+export const deleteQuestionnaireById = async (id: number) => {
+  // 先確認是否存在
+  const existing = await prisma.questionnaireVersion.findUnique({ where: { id } });
+  if (!existing) {
+    throw new Error(`Questionnaire version with ID ${id} not found`);
+  }
+
+  // Prisma cascade delete 需手動刪除子關聯（questions → options）
+  await prisma.questionOption.deleteMany({
+    where: { question: { versionId: id } },
+  });
+  await prisma.question.deleteMany({
+    where: { versionId: id },
+  });
+
+  return prisma.questionnaireVersion.delete({ where: { id } });
+};
+
+/**
+ * 更新問卷版本基本資訊（標題、描述、isActive）
+ */
+export const updateQuestionnaireById = async (
+  id: number,
+  data: { title?: string; description?: string; isActive?: boolean },
+) => {
+  const existing = await prisma.questionnaireVersion.findUnique({ where: { id } });
+  if (!existing) {
+    throw new Error(`Questionnaire version with ID ${id} not found`);
+  }
+
+  return prisma.questionnaireVersion.update({
+    where: { id },
+    data: {
+      title: data.title ?? existing.title,
+      description: data.description ?? existing.description,
+      isActive: typeof data.isActive === 'boolean' ? data.isActive : existing.isActive,
+    },
+    include: { group: true, questions: { include: { options: true } } },
+  });
+};
+
+/**
+ * 複製指定問卷版本（包含題目與選項），建立新版本
+ */
+export const duplicateQuestionnaireById = async (
+  id: number,
+  overrides?: { title?: string; description?: string }
+) => {
+  // 取出原版本及其題目與選項
+  const original = await prisma.questionnaireVersion.findUnique({
+    where: { id },
+    include: {
+      group: true,
+      questions: { include: { options: true } },
+    },
+  });
+
+  if (!original) {
+    throw new Error(`Questionnaire version with ID ${id} not found`);
+  }
+
+  // 找出該 group 目前最大版本號
+  const lastVersion = await prisma.questionnaireVersion.findFirst({
+    where: { groupId: original.groupId },
+    orderBy: { versionNumber: 'desc' },
+  });
+  const nextVersionNumber = (lastVersion?.versionNumber ?? 0) + 1;
+
+  // 建立新版本
+  const newVersion = await prisma.questionnaireVersion.create({
+    data: {
+      groupId: original.groupId,
+      versionNumber: nextVersionNumber,
+      title: overrides?.title ?? `${original.title} (副本)`,
+      description: overrides?.description ?? original.description,
+      questions: {
+        create: original.questions.map((q) => ({
+          text: q.text,
+          category: q.category,
+          order: q.order,
+          type: q.type,
+          required: q.required,
+          options:
+            q.options.length > 0
+              ? {
+                  create: q.options.map((opt) => ({
+                    text: opt.text,
+                    value: opt.value,
+                    order: opt.order,
+                  })),
+                }
+              : undefined,
+        })),
+      },
+    },
+    include: {
+      group: true,
+      questions: { include: { options: true } },
+    },
+  });
+
+  return newVersion;
+};
