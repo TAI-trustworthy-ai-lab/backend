@@ -6,12 +6,12 @@ const prisma = new PrismaClient();
  */
 export const createProject = async (data: {
   userId: number;
-  name: string;
+  name: string;                                                                     
   description?: string;
 }) => {
   // 檢查上限
   const count = await prisma.project.count({ where: { userId: data.userId } });
-  if (count >= 5) {
+  if (count >= 10) {
     throw new Error('You can only have up to 5 projects. Please delete an old one first.');
   }
 
