@@ -225,6 +225,23 @@
  *                     options:
  *                       - text: 是
  *                       - text: 否
+ * 
+ * /api/questionnaire/latest:
+ *   get:
+ *     summary: Get latest questionnaire version by groupName
+ *     description: 依 "建模前 / 建模中 / 建模後" 取得最新問卷版本（含題目＋選項）
+ *     tags: [Questionnaire]
+ *     parameters:
+ *       - in: query
+ *         name: groupName
+ *         schema:
+ *           type: string
+ *           example: 建模前
+ *         required: true
+ *         description: The name of the questionnaire group
+ *     responses:
+ *       200:
+ *         description: Latest questionnaire version found
  */
 
 
@@ -251,12 +268,13 @@ router.get('/all', questionnaireController.getAllQuestionnaires);
 // GET /api/questionnaire/group/latest → 取得三個階段最新版本
 router.get('/group/latest', questionnaireController.getLatestQuestionnaireGroups);
 
+// GET /api/questionnaire/:id → 用問卷版本 id 取得問卷內容
+router.get('/latest', questionnaireController.getLatestQuestionnaireByGroupName);
+
 // GET /api/questionnaire/version/:id → 明確用 version id 取得問卷內容
 router.get('/version/:id', questionnaireController.getQuestionnaireVersionById);
 
 // GET /api/questionnaire/:id → 舊版路徑（兼容用）
 router.get('/:id', questionnaireController.getQuestionnaireById);
-
-
 
 export default router;

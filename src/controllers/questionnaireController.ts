@@ -98,6 +98,28 @@ export const getAllQuestionnaires = async (req: Request, res: Response) => {
   }
 };
 
+// GET /api/questionnaire/latest
+export const getLatestQuestionnaireByGroupName = async (req: Request, res: Response) => {
+  try {
+    const groupName = req.query.groupName as string;
+
+    if (!groupName) {
+      return sendErrorResponse(res, 'Missing groupName parameter', 400);
+    }
+
+    const data = await questionnaireService.getLatestQuestionnaireByGroupName(groupName);
+
+    return sendSuccessResponse(res, data);
+  } catch (error) {
+    console.error('Error in getLatestQuestionnaireByGroupName:', error);
+    return sendErrorResponse(
+      res,
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+};
+
+
 // PATCH /api/questionnaire/:id
 export const updateQuestionnaire = async (req: Request, res: Response) => {
   try {

@@ -288,3 +288,37 @@ export const duplicateQuestionnaireById = async (
 
   return newVersion;
 };
+
+/**
+ * 依 groupName 取得該 group 的「最新問卷版本」(含題目與選項)
+ * GET /api/questionnaire/latest?groupName=建模前
+ */
+export const getLatestQuestionnaireByGroupName = async (groupName: string) => {
+  // 1. 找 group
+  const group = await prisma.questionnaireGroup.findUnique({
+    where: { name: groupName },
+  });
+
+  if (!group) {
+    throw new Error(`Group "${groupName}" not found`);
+  }
+
+  // 2. 找該 group 最新版本
+  const latestVersion = await prisma.questionnaireVersion.findFirst({
+    where: { groupId: group.id },
+    orderBy: { versionNumber: 'desc' },
+    include: {
+      group: true,
+      questions: {
+        orderBy: { order: 'asc' },
+        include: { options: true },
+      },
+    },
+  });
+
+  if (!latestVersion) {
+    throw new Error(`No questionnaire version found for group "${groupName}"`);
+  }
+
+  return latestVersion;
+};
