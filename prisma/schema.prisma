@@ -41,7 +41,7 @@ model ProjectTAIPriority {
   rank       Int          // 1 = 最重要 (前端拖拉順序)
   weight     Float?       // 選配：直接把 11 個 indicator 正規化後存起來
 
-  project    Project      @relation(fields: [projectId], references: [id])
+  project    Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, indicator]) // 每個 project 對每個 indicator 只出現一次
 }
@@ -67,7 +67,7 @@ model QuestionnaireVersion {
   createdAt     DateTime            @default(now())
   isActive      Boolean             @default(true)
 
-  group         QuestionnaireGroup  @relation(fields: [groupId], references: [id])
+  group         QuestionnaireGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
   questions     Question[]
   responses     Response[]
 }
@@ -82,7 +82,7 @@ model Question {
   type      QuestionType         @default(SCALE)  // 
   required  Boolean              @default(true)
 
-  version   QuestionnaireVersion @relation(fields: [versionId], references: [id])
+  version   QuestionnaireVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
   options   QuestionOption[]
   answers   Answer[]
 }
@@ -94,7 +94,7 @@ model QuestionOption {
   value      Int?     // 選配：如果這個選項要對應一個 scoring 值
   order      Int
 
-  question   Question @relation(fields: [questionId], references: [id])
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
   answers    Answer[]
 }
 
@@ -107,8 +107,8 @@ model Response {
   label       String?   // 選配：例如「第一次評估」、「v1.0 release 前」
 
   user        User                 @relation(fields: [userId], references: [id])
-  project     Project              @relation(fields: [projectId], references: [id])
-  version     QuestionnaireVersion @relation(fields: [versionId], references: [id])
+  project     Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  version     QuestionnaireVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
   answers     Answer[]
   report      Report?
 }
@@ -122,9 +122,9 @@ model Answer {
   textValue  String?   // 問答題文字
   createdAt  DateTime  @default(now())
  
-  response   Response        @relation(fields: [responseId], references: [id])
-  question   Question        @relation(fields: [questionId], references: [id])
-  option     QuestionOption? @relation(fields: [optionId], references: [id])
+  response   Response        @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  question   Question        @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  option     QuestionOption? @relation(fields: [optionId], references: [id], onDelete: Cascade)
 }
 
 
@@ -138,7 +138,7 @@ model Report {
   taiWeightSnapshot  Json?    // 選配：紀錄當下 Project 的權重 {"ACCURACY":0.2,...}
   llmMeta            Json?    // 選配：prompt、model name 等
 
-  response           Response @relation(fields: [responseId], references: [id])
+  response           Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
   images             ReportImage[]
 }
 
@@ -149,7 +149,7 @@ model ReportImage {
   caption   String?
   createdAt DateTime @default(now())
 
-  report    Report   @relation(fields: [reportId], references: [id])
+  report    Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
 }
 
 
