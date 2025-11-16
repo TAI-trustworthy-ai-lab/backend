@@ -2,18 +2,39 @@ FROM node:20.11-alpine
 
 WORKDIR /app
 
-RUN apk add --no-cache postgresql-client
+# 1. 安裝運行時和編譯時依賴
+RUN apk add --no-cache postgresql-client supervisor
 
 COPY package.json yarn.lock ./
 
-RUN yarn install
+# 2. 安裝編譯依賴，執行 yarn install，然後移除編譯工具
+RUN apk add --no-cache --virtual .build-deps \
+    build-base \
+    python3 \
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    giflib-dev \
+    && yarn install \
+    && apk del .build-deps
+
+# 3. 【關鍵修復】現在 service 啟動前，安裝 cairo, pango, giflib 的 RUNTIME 函式庫
+RUN apk add --no-cache \
+    cairo \
+    libjpeg \
+    pango \
+    giflib \
+    # 這些是 cairo 運行時的額外依賴
+    # (註：libgif 和 libpng 也可能需要，但我們先從 cairo 開始)
+    ttf-dejavu
 
 COPY . .
 ENV NODE_ENV=development
 
 RUN yarn prisma generate
 
-RUN apk add --no-cache supervisor
+# 3. 移除多餘的 supervisor 安裝 (已在步驟 1 完成)
+# RUN apk add --no-cache supervisor 
 
 COPY supervisord.conf /etc/supervisord.conf
 
