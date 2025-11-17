@@ -1,16 +1,7 @@
-!package.json
-!yarn.lock
-!src/
-!prisma/
-!config.js
-!tsconfig.json
-!docker-compose*.yml
-!Dockerfile*
-!src/config/
-
+# 忽略 node_modules，強制 Docker build 時重新安裝
 node_modules
-dist
-yarn-error.log
-.pnpm-debug.log
-.yarn
-.idea/
+
+# 忽略 npm 偵錯日誌
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
