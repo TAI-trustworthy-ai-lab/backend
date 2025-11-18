@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path'; // <-- 確保 'path' 模組有被匯入
 import axios from 'axios';
+import { v2 as cloudinary } from 'cloudinary';
 import { config as configDotenv } from 'dotenv';
 import { Chart, registerables } from 'chart.js';
 import { createCanvas, Canvas } from 'canvas';
@@ -87,6 +88,12 @@ interface LLMData {
   partial: [string, number][];
   none: [string, number][];
 }
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 // +++ 函式已修改 +++
 function loadPromptConfig(configPath: string = 'Prompt.json'): void {
@@ -850,7 +857,7 @@ async function integrateAndGenerateReport({
   outDir = 'outputs',
   llm_data_by_axis,
   llm_call,
-  questionnaire_type, // <-- ⭐ 新增 (來自 Python 變更)
+  questionnaire_type,
 }: {
   scores?: Record<string, number>;
   answersByAxis?: Record<string, number[]>;
@@ -859,7 +866,7 @@ async function integrateAndGenerateReport({
   outDir?: string;
   llm_data_by_axis?: Record<string, LLMData> | null;
   llm_call?: LLMCallFn;
-  questionnaire_type?: string | null; // <-- ⭐ 新增 (來自 Python 變更)
+  questionnaire_type?: string | null;
 }): Promise<{ jsonPath: string; report: any }> {
   fs.mkdirSync(outDir, { recursive: true });
   // 修正時間戳格式，避免 ":" 造成 Windows 路徑問題
@@ -895,7 +902,6 @@ async function integrateAndGenerateReport({
   let sections: any[] = [];
   if (llm_data_by_axis) {
     const _call = llm_call || callLlmScout;
-    // ******** ⭐ 傳入 questionnaire_type (來自 Python 變更) ********
     sections = await generateLlmSections(
       llm_data_by_axis,
       _call,
@@ -903,11 +909,25 @@ async function integrateAndGenerateReport({
     );
   }
 
+  let radarUrl = imgPath;
+  try {
+    if (process.env.CLOUDINARY_CLOUD_NAME) {
+      const uploadResult = await cloudinary.uploader.upload(imgPath, {
+        folder: process.env.CLOUDINARY_FOLDER || 'tai-reports',
+        resource_type: 'image',
+      });
+      radarUrl = uploadResult.secure_url;
+      console.log('[OK] Radar image uploaded to Cloudinary:', radarUrl);
+    }
+  } catch (e: any) {
+    console.warn('[WARN] Cloudinary upload failed:', e.message || e);
+  }
+
   const report = {
     meta: {
       generated_at: ts,
       title: title,
-      radar_image_path: imgPath,
+      radar_image_path: radarUrl,
     },
     scores: finalScores,
     summary: {
@@ -1207,6 +1227,7 @@ if (require.main === module) {
  * @param radarData (預期 0-100)
  * @returns
  */
+export { generateReportForResponse };
 export async function generateOverallAnalysis(
   overallScore: number,
   radarData: Record<string, number>,
