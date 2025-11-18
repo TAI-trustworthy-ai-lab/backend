@@ -27,9 +27,16 @@ DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=pu
 JWT_SECRET=your_secret_key
 API_URL=http://localhost:3001
 PORT=3001
+LLM_API_KEY=your_OpenRouter_API_KEY
+CLOUDINARY_CLOUD_NAME=your_cloud_name_here
+CLOUDINARY_API_KEY=your_api_key_here
+CLOUDINARY_API_SECRET=your_api_secret_here
+CLOUDINARY_FOLDER=tai-reports
 ```
 
 - Replace `your_secret_key` with a secure random string.
+- Replace `your_OpenRouter_API_KEY` with your own [OpenRouter](https://openrouter.ai/) API KEY.
+- If you want to save radar image on your own cloud, replace `your_cloud_name_here`, `your_api_key_here`, `your_api_secret_here` with your own [cloudinary](https://cloudinary.com/) API info.
 - This file is used to configure both the API and the database.
 
 ## 3. Start the Database and API (with Docker Compose)
