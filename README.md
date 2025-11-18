@@ -79,7 +79,7 @@ docker-compose --env-file config/.env.local up -d
   yarn prisma migrate dev
   ```
 - Reconstruct your backend:  
-```sh
+  ```sh
   docker-compose --env-file config/.env.local down
   docker-compose --env-file config/.env.local down -v
   docker-compose --env-file config/.env.local up -d --build
