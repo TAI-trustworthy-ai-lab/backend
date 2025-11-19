@@ -35,7 +35,7 @@ export const generateReport = async (req: Request, res: Response) => {
     const categoryScores: Record<string, number[]> = {};
 
     for (const ans of responseRecord.answers) {
-      if (ans.value && ans.question.category) {
+      if (ans.value !== null && ans.value !== undefined && ans.question.category) {
         const cat = ans.question.category;
         if (!categoryScores[cat]) categoryScores[cat] = [];
         categoryScores[cat].push(ans.value);
@@ -53,7 +53,7 @@ export const generateReport = async (req: Request, res: Response) => {
       totalCount++;
     }
 
-    const overallScore = parseFloat((totalSum / totalCount).toFixed(2));
+    const overallScore = totalCount > 0 ? parseFloat((totalSum / totalCount).toFixed(2)) : 0;
 
     // 模擬分析文字（未接LLM）
     // 請内容與LLM分析組再做更改
@@ -100,6 +100,7 @@ export const getReportByResponseId = async (req: Request, res: Response) => {
             version: { select: { id: true, title: true } },
           },
         },
+        images: true,
       },
     });
 
@@ -118,3 +119,48 @@ export const getReportByResponseId = async (req: Request, res: Response) => {
     );
   }
 };
+
+// controllers/reportController.ts
+
+export const addReportImage = async (req: Request, res: Response) => {
+  try {
+    const reportId = parseInt(req.params.reportId);
+    const { url, caption } = req.body;
+
+    if (!url) {
+      return res.status(400).json({
+        success: false,
+        message: "Image URL is required",
+      });
+    }
+
+    // 檢查 Report 是否存在
+    const reportExists = await prisma.report.findUnique({
+      where: { id: reportId },
+    });
+
+    if (!reportExists) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found",
+      });
+    }
+
+    const newImage = await prisma.reportImage.create({
+      data: {
+        reportId,
+        url,
+        caption,
+      },
+    });
+
+    return sendSuccessResponse(res, newImage, 201);
+
+  } catch (error) {
+    return sendErrorResponse(
+      res,
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+};
+

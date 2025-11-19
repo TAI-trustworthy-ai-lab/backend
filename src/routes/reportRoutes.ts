@@ -42,5 +42,37 @@ router.post('/generate/:responseId', reportController.generateReport);
  */
 router.get('/response/:responseId', reportController.getReportByResponseId);
 
+// routes/reportRoutes.ts
+
+/**
+ * @openapi
+ * /api/report/{reportId}/image:
+ *   post:
+ *     summary: Add an image to a report
+ *     tags: [Report]
+ *     parameters:
+ *       - in: path
+ *         name: reportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               url:
+ *                 type: string
+ *                 example: "https://example.com/my-image.png"
+ *               caption:
+ *                 type: string
+ *                 example: "Radar chart"
+ *     responses:
+ *       201:
+ *         description: Image added to report
+ */
+router.post('/:reportId/image', reportController.addReportImage);
 
 export default router;
