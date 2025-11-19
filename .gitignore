@@ -90,6 +90,7 @@ Thumbs.db
 # Temporary files
 temp/
 tmp/
+output/
 
 # Docker
 project-db-data/
