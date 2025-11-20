@@ -57,5 +57,5 @@ jobs:
             DB_PASSWORD='${{ secrets.DB_PASSWORD }}' \
             DB_NAME='${{ secrets.DB_NAME }}' \
             DATABASE_URL='postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASSWORD }}@db:5432/${{ secrets.DB_NAME }}' \
-            TAG=prod docker-compose -f docker-compose.prod.yml up -d
+            TAG=prod docker compose -f docker-compose.prod.yml up -d
           "
