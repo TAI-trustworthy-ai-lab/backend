@@ -1,40 +1,38 @@
-version: '3.8'
-
 services:
   api:
-    image: ${IMAGE_NAME}:prod
-    container_name: project-api-prod
+    image: ${CI_REGISTRY_IMAGE}:prod
+    container_name: project-api-production
     restart: unless-stopped
     ports:
-      - "${PORT}:${PORT}"
+      - "${PROD_PORT}:${PROD_PORT}"
+    environment:
+      NODE_ENV: production
+      PORT: ${PROD_PORT}
+      API_URL: ${API_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: ${DATABASE_URL}
     depends_on:
       db:
         condition: service_healthy
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT}/${DB_NAME}
-      JWT_SECRET: ${JWT_SECRET}
-      PORT: ${PORT}
-      API_URL: ${API_URL}
     networks:
       - project-network
     command: >
-      sh -c "sleep 10 && npx prisma migrate deploy && yarn start"
+      sh -c "sleep 5 &&
+             npx prisma migrate deploy &&
+             yarn start"
 
   db:
     image: postgres:15
-    container_name: project-db-prod
+    container_name: project-db-production
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     volumes:
-      - project-db-prod-data:/var/lib/postgresql/data
-    ports:
-      - "${DB_PORT}:5432"
+      - project-db-production-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -42,7 +40,8 @@ services:
       - project-network
 
 volumes:
-  project-db-prod-data:
+  project-db-production-data:
+
 
 networks:
   project-network:
