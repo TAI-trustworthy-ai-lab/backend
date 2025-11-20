@@ -39,7 +39,7 @@ jobs:
 
       - name: Send docker-compose.yml
         run: |
-          scp -o StrictHostKeyChecking=no backend/docker-compose.prod.yml \
+          scp -o StrictHostKeyChecking=no docker-compose.prod.yml \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/opt/project-api/
 
       - name: Deploy to Server
