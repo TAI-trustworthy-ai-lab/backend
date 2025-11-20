@@ -25,7 +25,6 @@ jobs:
 
       - name: Build & Push Docker Image
         run: |
-          cd backend
           docker build -t ${{ secrets.IMAGE_NAME }}:prod -f Dockerfile .
           docker push ${{ secrets.IMAGE_NAME }}:prod
 
@@ -41,12 +40,12 @@ jobs:
       - name: Send docker-compose.yml
         run: |
           scp -o StrictHostKeyChecking=no backend/docker-compose.prod.yml \
-            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/opt/syntheza-api/
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/opt/project-api/
 
       - name: Deploy to Server
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
-            cd /opt/syntheza-api &&
+            cd /opt/project-api &&
             docker login -u '${{ secrets.CI_REGISTRY_USER }}' -p '${{ secrets.CI_REGISTRY_PASSWORD }}' '${{ secrets.DOCKER_REGISTRY }}' &&
             docker pull '${{ secrets.IMAGE_NAME }}:prod' &&
             docker network create gitlab-network || true &&
