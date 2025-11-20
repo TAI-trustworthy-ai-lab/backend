@@ -48,7 +48,7 @@ jobs:
             cd /opt/project-api &&
             docker login -u '${{ secrets.CI_REGISTRY_USER }}' -p '${{ secrets.CI_REGISTRY_PASSWORD }}' '${{ secrets.DOCKER_REGISTRY }}' &&
             docker pull '${{ secrets.IMAGE_NAME }}:prod' &&
-            docker network create gitlab-network || true &&
+            docker network create project-network || true &&
             CI_REGISTRY_IMAGE='${{ secrets.IMAGE_NAME }}' \
             PORT='${{ secrets.API_PORT }}' \
             JWT_SECRET='${{ secrets.JWT_SECRET }}' \

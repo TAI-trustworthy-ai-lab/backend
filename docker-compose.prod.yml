@@ -27,7 +27,7 @@ services:
     #   - "traefik.http.routers.api-prod.tls=true"
     #   - "traefik.http.routers.api-prod.tls.certresolver=myresolver"
     #   - "traefik.http.routers.api-prod.service=api-prod"
-    #   - "traefik.docker.network=gitlab-network"
+    #   - "traefik.docker.network=project-network"
 
     command: >
       sh -c "echo $DATABASE_URL && npx prisma migrate deploy && yarn start"
