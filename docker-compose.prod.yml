@@ -19,18 +19,13 @@ services:
     networks:
       - project-network
 
-    # labels:
-    #   - "traefik.enable=true"
-    #   - "traefik.http.services.api-prod.loadbalancer.server.port=${PORT}"
-    #   - "traefik.http.routers.api-prod.rule=Host(`api.mineria.ovh`)"
-    #   - "traefik.http.routers.api-prod.entrypoints=websecure"
-    #   - "traefik.http.routers.api-prod.tls=true"
-    #   - "traefik.http.routers.api-prod.tls.certresolver=myresolver"
-    #   - "traefik.http.routers.api-prod.service=api-prod"
-    #   - "traefik.docker.network=project-network"
-
-    command: >
-      sh -c "echo $DATABASE_URL && npx prisma migrate deploy && yarn start"
+    command:
+      - sh
+      - -c
+      - |
+          echo "$DATABASE_URL"
+          npx prisma migrate deploy
+          yarn start
 
   db:
     image: postgres:15

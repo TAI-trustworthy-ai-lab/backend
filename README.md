@@ -78,3 +78,15 @@ docker-compose --env-file config/.env.local up -d
 - Put your `.env.local` in the `config` folder.
 - Start everything with `docker-compose --env-file config/.env.local up -d`.
 - Edit code and see changes live thanks to hot reload and Docker volumes.
+
+
+**Label Traefik, store here**
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.services.api-prod.loadbalancer.server.port=${PORT}"
+    #   - "traefik.http.routers.api-prod.rule=Host(`api.mineria.ovh`)"
+    #   - "traefik.http.routers.api-prod.entrypoints=websecure"
+    #   - "traefik.http.routers.api-prod.tls=true"
+    #   - "traefik.http.routers.api-prod.tls.certresolver=myresolver"
+    #   - "traefik.http.routers.api-prod.service=api-prod"
+    #   - "traefik.docker.network=project-network"
