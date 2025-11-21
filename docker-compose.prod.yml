@@ -1,6 +1,6 @@
 services:
   api:
-    image: ${CI_REGISTRY_IMAGE}:prod
+    image: ${IMAGE_NAME}:prod
     container_name: project-api-production
     restart: unless-stopped
     ports:
@@ -41,7 +41,6 @@ services:
 
 volumes:
   project-db-production-data:
-
 
 networks:
   project-network:
