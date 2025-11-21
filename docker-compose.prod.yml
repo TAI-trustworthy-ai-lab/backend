@@ -1,6 +1,6 @@
 services:
   api:
-    image: ${IMAGE_NAME}:prod
+    image: ${IMAGE_NAME}
     container_name: project-api-production
     restart: unless-stopped
     ports:
