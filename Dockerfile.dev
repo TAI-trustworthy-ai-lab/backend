@@ -1,19 +1,30 @@
-FROM node:20.11-alpine
+FROM node:20.11-slim
 
 WORKDIR /app
 
-RUN apk add --no-cache postgresql-client
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    python3 \
+    pkg-config \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    libpixman-1-dev \
+    libfreetype6-dev \
+    postgresql-client \
+    supervisor \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY package.json yarn.lock ./
 
 RUN yarn install
 
 COPY . .
+
 ENV NODE_ENV=development
 
 RUN yarn prisma generate
-
-RUN apk add --no-cache supervisor
 
 COPY supervisord.conf /etc/supervisord.conf
 

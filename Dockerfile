@@ -1,8 +1,19 @@
-FROM node:20.11-alpine AS builder
+FROM node:20.11-slim AS builder
 
 WORKDIR /app
 
-RUN apk add --no-cache python3 make g++
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    pkg-config \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    libpixman-1-dev \
+    libfreetype6-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY package.json yarn.lock ./
 RUN yarn install
@@ -14,11 +25,22 @@ ENV NODE_ENV=production
 RUN npx prisma generate
 RUN yarn build
 
-FROM node:20.11-alpine
+FROM node:20.11-slim
 
 WORKDIR /app
 
-RUN apk add --no-cache python3 make g++
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    pkg-config \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    libpixman-1-dev \
+    libfreetype6-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
