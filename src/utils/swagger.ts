@@ -14,7 +14,7 @@ const swaggerOptions = {
       {
         url: process.env.API_URL?.startsWith('http')
           ? process.env.API_URL
-          : `http://${process.env.API_URL}`,
+          : `https://${process.env.API_URL}`,
         description: 'Development server',
       },
     ],

@@ -1,5 +1,9 @@
-import express from 'express';
-import * as reportController from '../controllers/reportController';
+import express from "express";
+import {
+    generateReport,
+    getReportByResponseId,
+    addReportImage,
+} from "../controllers/reportController";
 
 const router = express.Router();
 
@@ -18,9 +22,8 @@ const router = express.Router();
  *     responses:
  *       201:
  *         description: Report generated successfully
- *
  */
-router.post('/generate/:responseId', reportController.generateReport);
+router.post("/generate/:responseId", generateReport);
 
 /**
  * @openapi
@@ -40,9 +43,7 @@ router.post('/generate/:responseId', reportController.generateReport);
  *       404:
  *         description: Report not found
  */
-router.get('/response/:responseId', reportController.getReportByResponseId);
-
-// routes/reportRoutes.ts
+router.get("/response/:responseId", getReportByResponseId);
 
 /**
  * @openapi
@@ -65,14 +66,12 @@ router.get('/response/:responseId', reportController.getReportByResponseId);
  *             properties:
  *               url:
  *                 type: string
- *                 example: "https://example.com/my-image.png"
  *               caption:
  *                 type: string
- *                 example: "Radar chart"
  *     responses:
  *       201:
- *         description: Image added to report
+ *         description: Image added
  */
-router.post('/:reportId/image', reportController.addReportImage);
+router.post("/:reportId/image", addReportImage);
 
 export default router;
