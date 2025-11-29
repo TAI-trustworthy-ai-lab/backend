@@ -16,14 +16,15 @@ export class ReportService {
    * 4. 回傳：report record + radarData + scores + overallScore + analysisText
    */
   async generateReport(responseId: number) {
-    // 1) 取得 Response + Answers + Project TAI 排序（做 snapshot 用）
+    // 1) 取得 Response + Answers + Project TAI 排序
     const response = await prisma.response.findUnique({
       where: { id: responseId },
       include: {
         answers: { include: { question: true, option: true } },
         project: {
           include: {
-            taiOrders: true, // ProjectTAIPriority[]
+            // 既然 taiOrders 本身就有順序，我們直接讀取即可
+            taiOrders: true, 
           },
         },
       },
@@ -34,89 +35,116 @@ export class ReportService {
     }
 
     // 2) 整理答案 -> { axis, value }
-    // 2) 整理答案 -> { axis, value }
-    // 支援 SCALE / SINGLE_CHOICE / MULTIPLE_CHOICE
     const cleanedAnswers = response.answers.map((a) => {
       let score: number | null = null;
 
-      // case 1：Likert / SCALE 題（數值儲存在 Answer.value）
       if (a.value !== null && a.value !== undefined) {
         score = Number(a.value);
-      }
-
-      // case 2：單選題 / 多選題：從 option.value 取得分數
-      else if (a.option && a.option.value !== null && a.option.value !== undefined) {
+      } else if (a.option && a.option.value !== null && a.option.value !== undefined) {
         score = Number(a.option.value);
       }
 
-      if (score === -1) {
-        score = 0; // treat null or -1 as 0 score
-      }
-      if (score === null) return null;
+      // -1 表示 N/A，回傳 null 讓後面過濾掉
+      if (score === -1) score = -1; 
+      if (score === null) return null; 
 
       return {
         axis: a.question.category,
-        value: score, // 0 / 100 / -1
+        value: score, 
       };
     })  
-    .filter(
-      (item): item is { axis: string; value: number } => item !== null
-    );
+    .filter((item): item is { axis: string; value: number } => item !== null);
 
-    // 3) 計算各軸平均分數 (0–1)
+    // 3) 計算各軸平均分數 (0–1, 或 -1 表示 N/A)
     const taiScores = computeTAIScores(cleanedAnswers);
 
     // 4) 轉成 radarData 給前端畫圖用
     const radarData = computeRadarData(taiScores);
 
-    // 5) overall score (0–1)
-    const scoreValues = Object.values(taiScores).filter((v) => !isNaN(v));
-    const overallScore =
-      scoreValues.length > 0
-        ? scoreValues.reduce((s, x) => s + x, 0) / scoreValues.length
+    // ============================================================
+    // 5) 準備權重 Snapshot & 計算 Overall Score (依照 taiOrders 順序配權重)
+    // ============================================================
+    
+    const weightMap: Record<string, number> = {};
+    const taiOrders = response.project?.taiOrders || [];
+    let hasCustomWeights = false;
+
+    if (taiOrders.length > 0) {
+      hasCustomWeights = true;
+
+      // 直接依據陣列的順序 (Index) 分配權重
+      taiOrders.forEach((item, index) => {
+        let assignedWeight = 0.04; // 預設給最後梯隊 (第 8~11 名)
+
+        if (index < 4) {
+            // 第 1 ~ 4 名 (Index 0, 1, 2, 3) -> 0.15
+            assignedWeight = 0.15;
+        } else if (index < 7) {
+            // 第 5 ~ 7 名 (Index 4, 5, 6) -> 0.08
+            assignedWeight = 0.08;
+        } 
+        // 第 8 名以後 (Index 7+) -> 0.04
+
+        weightMap[item.indicator] = assignedWeight;
+      });
+    }
+
+    // 開始計算加權平均
+    let totalWeightedScore = 0;
+    let totalValidWeight = 0;
+
+    // 遍歷所有計算出來的軸分數
+    for (const [axis, score] of Object.entries(taiScores)) {
+        // 遇到 N/A (-1) 或 NaN，直接跳過 (不計入分子，也不計入分母)
+        if (score === -1 || isNaN(score)) {
+            continue;
+        }
+
+        // 決定該軸的權重
+        let weight = 1; // 若無專案設定，預設權重為 1 (算術平均)
+        
+        if (hasCustomWeights) {
+            // 如果該軸有在排序設定中，取出分配好的權重
+            // 若該軸不在 taiOrders 裡 (異常狀況)，這裡視為 0 或給予最低權重
+            weight = weightMap[axis] ?? 0; 
+        }
+
+        // 分子累加：分數 * 權重
+        totalWeightedScore += (score * weight);
+        // 分母累加：有效權重
+        totalValidWeight += weight;
+    }
+
+    // 計算最終總分
+    const overallScore = totalValidWeight > 0 
+        ? totalWeightedScore / totalValidWeight 
         : 0;
 
-    // 6) snapshot：當下 Project 的 TAI 權重（如果有設定）
-    let taiWeightSnapshot: Record<string, number> | null = null;
-    if (response.project && response.project.taiOrders.length > 0) {
-      taiWeightSnapshot = {};
-      for (const item of response.project.taiOrders) {
-        // 例如：{ ACCURACY: 0.2, RELIABILITY: 0.1, ... }
-        taiWeightSnapshot[item.indicator] =
-          item.weight ?? 0; // 如果沒有 weight 就先存 0
-      }
-    }
-    
-    console.log("Cleaned answers:", cleanedAnswers); // debug  
-    console.log("TAI scores:", taiScores); // debug
-    console.log("Overall score:", overallScore); // debug
+    // 準備要存入 DB 的 Snapshot (這裡存的就是我們剛剛分配好的 0.15/0.08/0.04)
+    const taiWeightSnapshot = hasCustomWeights ? weightMap : null;
 
-    console.log("typeof overallScore:", typeof overallScore);
-    console.log("instance:", overallScore);
+    console.log("TAI scores:", taiScores); 
+    console.log("Weight Map (Assigned by Order):", weightMap);
+    console.log("Total Weighted Score:", totalWeightedScore);
+    console.log("Total Valid Weight:", totalValidWeight);
+    console.log("Overall Score (Weighted):", overallScore);
 
-    // 7) 建立 LLM prompt 並呼叫 LLM 產生分析
-    const prompt = this.buildLLMPrompt(taiScores, overallScore);
+    // 6) 建立 LLM prompt 
+    const prompt = this.buildLLMPrompt(taiScores);
 
-    console.log("Building LLM prompt..."); // debug
-    //console.log("LLM Prompt:", prompt); // debug
-
+    // 7) 呼叫 LLM
     const analysisText = await callLLM(prompt);
 
-    // 8) upsert 進 Report table（以 responseId 為 unique）
-    const modelUsed = "openai/gpt-4.1"; // 和 llm.ts 預設一致
-
-    console.log("TAI Scores:", taiScores);
-    console.log("Cleaned answers:", cleanedAnswers);
-    console.log("Ready to UPSERT report for response =", responseId);
+    // 8) upsert 進 Report table
+    const modelUsed = "openai/gpt-oss-20b:free"; 
 
     const reportRecord = await prisma.report.upsert({
-
       where: { responseId },
       update: {
         overallScore,
         analysisText,
-        radarData: taiScores,          // 這裡存 axis -> score (0–1) 的 map
-        taiWeightSnapshot,
+        radarData: taiScores,
+        taiWeightSnapshot, // 存入權重快照
         llmMeta: {
           model: modelUsed,
           provider: "openrouter",
@@ -128,7 +156,7 @@ export class ReportService {
         overallScore,
         analysisText,
         radarData: taiScores,
-        taiWeightSnapshot,
+        taiWeightSnapshot, // 存入權重快照
         llmMeta: {
           model: modelUsed,
           provider: "openrouter",
@@ -148,11 +176,10 @@ export class ReportService {
       },
     });
 
-    // 9) 回傳給 controller / 前端
     return {
-      report: reportRecord, // DB 中的 Report（含 response 簡要資訊 + images）
-      radarData,            // [{ axis, value }] 給前端畫圖用
-      scores: taiScores,    // { ACCURACY: 0.8, ... } 0–1
+      report: reportRecord,
+      radarData,
+      scores: taiScores,
       overallScore,
       analysisText,
     };
@@ -161,43 +188,58 @@ export class ReportService {
   /**
    * 建立 LLM Prompt
    */
-  buildLLMPrompt(scores: Record<string, number>, overallScore: number) {
-    console.log("before loading prompt config");  // debug
-
-    // 如果之後想把 prompt.json 的文字塞進來可以用這個物件
-    let promptConfig = {};
+  buildLLMPrompt(scores: Record<string, number>) {
+    let promptConfig: any = {};
     try {
       promptConfig = loadPromptConfig();
-      console.log("PROMPT CONFIG LOADED:", promptConfig);
     } catch (err) {
       console.error("FAILED TO LOAD prompt.json:", err);
-      promptConfig = {};   // fallback
+      promptConfig = {};
     }
-    console.log("PROMPT CONFIG LOADED:", promptConfig);
     
     const background = promptConfig?.background ?? "";
 
-    return `
-你是一位專業的可信任 AI（TAI）分析師。
+    const axisStatus: string[] = [];
+    
+    // 過濾掉 -1 (N/A) 的軸，只對有效軸排序
+    const validScores = Object.entries(scores)
+        .filter(([, score]) => score !== -1 && !isNaN(score))
+        .sort(([, a], [, b]) => b - a);
+    
+    for (const [axis, score] of validScores) {
+      const percentage = (score * 100).toFixed(0);
+      let status: string;
+      
+      if (score >= 0.8) {
+        status = `[完全符合] ${axis}：達成度 ${percentage}%`;
+      } else if (score >= 0.6) {
+        status = `[大部分符合] ${axis}：達成度 ${percentage}%`;
+      } else if (score >= 0.4) {
+        status = `[部分符合] ${axis}：達成度 ${percentage}%`;
+      } else {
+        status = `[尚未達成] ${axis}：達成度 ${percentage}%`;
+      }
+      axisStatus.push(status);
+    }
 
+    const naAxes = Object.entries(scores).filter(([, score]) => score === -1);
+    if (naAxes.length > 0) {
+      axisStatus.push(`\n以下面向因問答數量為零，標註為「不適用 (N/A)」：`);
+      naAxes.forEach(([axis]) => {
+          axisStatus.push(`[不適用] ${axis}`);
+      });
+    }
+    
+    const statusList = axisStatus.join('\n* ');
+    
+    return `
 ${background}
 
-以下是某次 AI 系統評估的結果（0–1）：
+以下是本次評估的 11 個可信賴 AI 倫理指標的符合程度（由高至低）：
 
-Overall Score:
-${overallScore.toFixed(2)}
+* ${statusList}
 
-各面向分數（TAI 指標）：
-${JSON.stringify(scores, null, 2)}
-
-請基於這些資料，撰寫一份至少 150 字的專業分析，包含：
-
-1. Overall Summary（整體表現）
-2. Strengths（最高分的 1–2 個指標，說明為何表現良好）
-3. Weaknesses / Risks（最低分的 1–2 個指標，指出風險或潛在問題）
-4. Actionable Recommendations（至少 2–3 個具體可執行的改善建議）
-
-請使用專業、清楚、具建設性的語氣。
+請根據您作為「可信任 AI 顧問」的角色，並依據 System Prompt 中要求的格式（改善建議段落 + Markdown 表格計畫），輸出分析報告。
     `;
   }
 }
