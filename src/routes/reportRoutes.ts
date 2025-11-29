@@ -131,7 +131,7 @@ router.post("/generate/:responseId", generateReport);
  * @openapi
  * /api/report/response/{responseId}:
  *   get:
- *     summary: [Legacy] Get a stored report by responseId
+ *     summary: "Legacy - Get a stored report by responseId"
  *     description: >
  *       **Legacy API**：若系統有將 report 寫入資料庫，可透過 responseId 讀回。
  *       若目前系統不再儲存報告，此端點可以標記為 deprecated 或移除。
@@ -171,7 +171,7 @@ router.get("/response/:responseId", getReportByResponseId);
  * @openapi
  * /api/report/{reportId}/image:
  *   post:
- *     summary: [Legacy] Add an image to a stored report
+ *     summary: "Legacy - Add an image to a stored report"
  *     description: >
  *       **Legacy / Optional API**：當系統有將報告存入資料庫，且需要上傳補充圖像時使用。
  *       若目前不再將 report 與 image 存入 DB，可將此端點標記為 deprecated 或移除。

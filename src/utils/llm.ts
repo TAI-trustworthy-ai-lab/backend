@@ -1,10 +1,9 @@
 import axios from "axios";
-import { loadPromptConfig } from "../config/prompt";
+import { loadPromptConfig } from "../config/promptConfig";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_MODEL = "openai/gpt-4.1";          // 主模型
-const FALLBACK_MODEL = "google/gemini-2.0-pro";   // 備用模型
-
+const DEFAULT_MODEL = "openai/gpt-oss-20b:free";
+const FALLBACK_MODEL = "google/gemma-2-9b-it:free";
 /**
  * Call LLM using OpenRouter
  * Includes:
@@ -16,10 +15,19 @@ const FALLBACK_MODEL = "google/gemini-2.0-pro";   // 備用模型
 export async function callLLM(
   userPrompt: string,
   model: string = DEFAULT_MODEL,
-  retryCount = 2
+  retryCount = 1
 ): Promise<string> {
-  const prompts = loadPromptConfig();
-  const systemPrompt = prompts?.common_system_prompt || "You are a helpful AI.";
+  console.log("Preparing to call LLM...");
+
+  // prompt config
+  let promptCfg: any = {};
+  try {
+    promptCfg = loadPromptConfig();
+  } catch {
+    console.warn("prompt.json 載入失敗（使用預設 system prompt）");
+  }
+
+  const systemPrompt = promptCfg?.common_system_prompt || "You are a helpful AI assistant.";
 
   const payload = {
     model,
@@ -29,7 +37,11 @@ export async function callLLM(
     ],
   };
 
+  //console.log("this is debug"); // debug
+  //console.log(`[LLM] Using model: ${model}`); // debug
+
   try {
+    //console.log("[LLM] sending request to OpenRouter...");
     const resp = await axios.post(OPENROUTER_URL, payload, {
       timeout: 100000, // 100 秒 timeout
       headers: {
@@ -38,13 +50,17 @@ export async function callLLM(
       },
     });
 
+    //console.log("[LLM] got response"); // debug
+
     return resp.data.choices?.[0]?.message?.content || "";
   } catch (err: any) {
-    console.warn(`[LLM] Model "${model}" failed: ${err.message}`);
+    console.warn("[LLM ERROR RAW]", err.response?.data || err.message);
+    console.warn(`[LLM] Model "${model}" failed: ${err.message}`); // debug
+    
 
     // Retry logic
     if (retryCount > 0) {
-      console.log(`[LLM] Retrying... Attempts left: ${retryCount}`);
+      console.log(`[LLM] Retrying... Attempts left: ${retryCount}`); // debug
       await new Promise((r) => setTimeout(r, 1200)); // 1.2s retry delay
       return callLLM(userPrompt, model, retryCount - 1);
     }
