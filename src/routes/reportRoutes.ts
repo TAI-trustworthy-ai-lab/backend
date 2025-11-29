@@ -5,6 +5,8 @@ import {
   addReportImage,
 } from "../controllers/reportController";
 
+import { generatePDF } from "../controllers/pdfController";
+
 const router = express.Router();
 
 /**
@@ -228,5 +230,7 @@ router.get("/response/:responseId", getReportByResponseId);
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post("/:reportId/image", addReportImage);
+
+router.post("/pdf", generatePDF);
 
 export default router;
