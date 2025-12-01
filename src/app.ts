@@ -16,6 +16,8 @@ import responseRoutes from './routes/responseRoutes';
 import projectRoutes from './routes/projectRoutes';
 import reportRoutes from './routes/reportRoutes';
 
+import authRoutes from './routes/authRoutes';
+
 const app: Application = express();
 
 app.use(cors());
@@ -25,6 +27,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(requestLogger);
+
+app.use('/api/auth', authRoutes);
 
 app.use('/api/user', userRoutes);
 app.use('/api/questionnaire', questionnaireRoutes);

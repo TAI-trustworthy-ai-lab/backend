@@ -1,6 +1,9 @@
 import jwt, { SignOptions, Secret } from 'jsonwebtoken';
 
-interface TPayload { id: string }
+interface TPayload { 
+  id: string;
+  role: string;
+}
 
 export const generateToken = (payload: TPayload, expiresIn: string | number): string => {
   return jwt.sign(payload, process.env.JWT_SECRET as Secret, {
