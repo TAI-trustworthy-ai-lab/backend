@@ -27,6 +27,9 @@ DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=pu
 JWT_SECRET=your_secret_key
 API_URL=http://localhost:3001
 PORT=3001
+
+LLM_API_KEY=your_API_KEY
+RESEND_API_KEY=your_resend_api_key
 ```
 
 - Replace `your_secret_key` with a secure random string.
