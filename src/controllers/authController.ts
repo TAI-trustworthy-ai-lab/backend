@@ -61,7 +61,6 @@ export const register = async (req: Request, res: Response) => {
 
     // 寄出驗證信
     const verifyUrl = `http://localhost:3001/api/auth/verify-email?token=${token}`;
-
     await sendVerificationEmail(email, verifyUrl);
 
     return sendSuccessResponse(res, "驗證信已寄出，請至 Email 查收");
@@ -73,7 +72,7 @@ export const register = async (req: Request, res: Response) => {
 
 /**
  * -------------------------
- *   Verify Email
+ *   Verify Email (含前端 redirect)
  * -------------------------
  */
 export const verifyEmail = async (req: Request, res: Response) => {
@@ -100,7 +99,7 @@ export const verifyEmail = async (req: Request, res: Response) => {
       },
     });
 
-    return sendSuccessResponse(res, "Email 驗證成功，請回到登入頁面登入！");
+    return res.redirect("http://localhost:3000/verify-success");
   } catch (err) {
     console.error("[verifyEmail] Error:", err);
     return sendErrorResponse(res, "Email 驗證失敗", 500);
@@ -136,7 +135,10 @@ export const login = async (req: Request, res: Response) => {
     }
 
     // 產生 JWT
-    const token = generateToken({ id: user.id.toString(), role: user.role }, "1h");
+    const token = generateToken(
+      { id: user.id.toString(), role: user.role },
+      "1h"
+    );
 
     return sendSuccessResponse(res, {
       token,
@@ -150,7 +152,6 @@ export const login = async (req: Request, res: Response) => {
     return sendErrorResponse(res, "登入失敗", 500);
   }
 };
-
 
 /**
  * ======================================================
@@ -173,14 +174,14 @@ export const resendVerification = async (req: Request, res: Response) => {
       return sendNotFoundResponse(res, "查無此 Email 對應的使用者");
     }
 
-    // 已驗證,不需重送
+    // 已驗證：不需再寄
     if (user.emailVerified) {
       return sendSuccessResponse(res, {
         message: "此 Email 已完成驗證，無需重送驗證信",
       });
     }
 
-    // 限制：5 分鐘只能重送一次
+    // 限制：5 分鐘內不能重送
     if (user.verifyTokenExp && user.verifyTokenExp > new Date()) {
       const waitSeconds = Math.ceil(
         (user.verifyTokenExp.getTime() - Date.now()) / 1000
@@ -214,4 +215,3 @@ export const resendVerification = async (req: Request, res: Response) => {
     return sendErrorResponse(res, "重送驗證信失敗", 500);
   }
 };
-
