@@ -1,3 +1,4 @@
+// src/controllers/reportController.ts
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { sendSuccessResponse, sendErrorResponse } from "../utils/responseHandler";
@@ -11,10 +12,14 @@ const prisma = new PrismaClient();
 export const generateReport = async (req: Request, res: Response): Promise<void> => {
   try {
     const responseId = Number(req.params.responseId);
+    if (isNaN(responseId)) {
+      sendErrorResponse(res, "Invalid responseId", 400);
+      return;
+    }
 
-    const { report } : any = await reportService.generateReport(responseId);
+    const result = await reportService.generateReport(responseId);
 
-    sendSuccessResponse(res, report, 201);
+    sendSuccessResponse(res, result, 201);
   } catch (error: any) {
     sendErrorResponse(res, error.message);
   }
