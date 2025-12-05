@@ -4,10 +4,20 @@ import { sendUnauthorizedResponse } from '../utils/responseHandler';
 import { verifyToken } from '../utils/jwtHandler';
 import { UserRole } from '@prisma/client';
 
+const getTokenFromRequest = (request: Request): string | null => {
+  const authHeader = request.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.split(' ')[1];
+  }
+  if (request.cookies?.jwt) {
+    return request.cookies.jwt;
+  }
+  return null;
+};
+
 const protectAuth = async (request: Request, response: Response, next: NextFunction): Promise<void> => {
   try {
-    const authHeader = request.headers.authorization;
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : request.cookies.jwt;
+    const token = getTokenFromRequest(request);
 
     if (!token) {
       console.warn('No JWT token provided');
@@ -34,7 +44,8 @@ const protectAuth = async (request: Request, response: Response, next: NextFunct
 
 const protectAdmin = async (request: Request, response: Response, next: NextFunction): Promise<void> => {
   try {
-    const token = request.cookies.jwt;
+    const token = getTokenFromRequest(request);
+
     if (!token) {
       sendUnauthorizedResponse(response, 'Unauthorized - you need to login');
       return;
@@ -47,7 +58,7 @@ const protectAdmin = async (request: Request, response: Response, next: NextFunc
       return;
     }
 
-    request.user = authUser;
+    (request as any).user = authUser;
     next();
   } catch (error) {
     console.error('Admin authentication error:', error);

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import {
   createUserController,
-  loginUserController,
+  //loginUserController,
   deleteUserController,
   findAllUsersController,
   findUserByIdController,
@@ -10,7 +10,7 @@ import {
   validateLoginData,
   logoutUserController,
 } from '../controllers/userController';
-import { protectAuth } from '../middlewares/authMiddleware';
+import { protectAuth, protectAdmin } from '../middlewares/authMiddleware';
 
 const router = Router();
 
@@ -18,7 +18,7 @@ const router = Router();
  * @swagger
  * /api/user/signup:
  *   post:
- *     summary: Create a new user
+ *     summary: Create a new user by admin(only admin can create users), admin can create some accounts for testing
  *     tags:
  *       - User
  *     requestBody:
@@ -46,68 +46,7 @@ const router = Router();
  *       500:
  *         description: Internal server error
  */
-router.post('/signup', createUserController);
-
-/**
- * @swagger
- * /api/user/login:
- *   post:
- *     summary: Log in a user
- *     tags:
- *       - User
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *                 example: user@example.com
- *               password:
- *                 type: string
- *                 example: password123
- *     responses:
- *       200:
- *         description: Login successful
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     token:
- *                       type: string
- *                       example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
- *                     user:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: integer
- *                           example: 1
- *                         role:
- *                           type: string
- *                           example: USER
- *                 message:
- *                   type: string
- *                   example: Request successful
- *       400:
- *         description: Missing email or password
- *       401:
- *         description: Invalid credentials
- *       404:
- *         description: User not found
- *       500:
- *         description: Internal server error
- */
-router.post('/login', loginUserController);
-
+router.post('/signup', protectAuth, protectAdmin, createUserController);
 
 /**
  * @swagger
@@ -185,7 +124,7 @@ router.get('/:id', protectAuth, findUserByIdController);
  *       500:
  *         description: Internal server error
  */
-router.get('/', protectAuth, findAllUsersController);
+router.get('/', protectAuth, protectAdmin, findAllUsersController);
 
 /**
  * @swagger
@@ -240,6 +179,6 @@ router.put('/:id', protectAuth, updateUserController);
  *       500:
  *         description: Internal server error
  */
-router.delete('/:id', protectAuth, deleteUserController);
+router.delete('/:id', protectAuth, protectAdmin, deleteUserController);
 
 export default router;

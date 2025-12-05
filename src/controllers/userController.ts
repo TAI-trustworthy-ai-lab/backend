@@ -136,6 +136,10 @@ export const updateUserController = async (req: Request, res: Response): Promise
     const { id } = req.params;
     const { name } = req.body;
 
+    if (req.user.role !== 'ADMIN' && req.user.id !== Number(id)) {
+      return sendErrorResponse(res, "You can only update your own profile", 403);
+    }
+
     const user = await UserService.findUserById(Number(id));
     if (!user) {
       sendNotFoundResponse(res, 'User not found');
@@ -149,7 +153,7 @@ export const updateUserController = async (req: Request, res: Response): Promise
     sendErrorResponse(res, 'Internal server error', HttpStatusCode.INTERNAL_SERVER_ERROR);
   }
 };
-
+/*
 export const loginUserController = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
@@ -188,6 +192,7 @@ export const loginUserController = async (req: Request, res: Response): Promise<
     sendErrorResponse(res, 'Internal server error', HttpStatusCode.INTERNAL_SERVER_ERROR);
   }
 };
+*/
 
 export const logoutUserController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
