@@ -62,69 +62,88 @@ export class ReportService {
     const radarData = computeRadarData(taiScores);
 
     // ============================================================
-    // 5) 準備權重 Snapshot & 計算 Overall Score (依照 taiOrders 順序配權重)
+    // 5) 準備權重 Snapshot & 計算 Overall Score
+    //    - 若 ProjectTAIPriority.weight 有值 -> 使用者自訂 (已正規化 0~1)
+    //    - 否則 -> 11 個指標等權重
     // ============================================================
-    
-    const weightMap: Record<string, number> = {};
+
     const taiOrders = response.project?.taiOrders || [];
-    let hasCustomWeights = false;
 
-    if (taiOrders.length > 0) {
-      hasCustomWeights = true;
+    const weightMap: Record<string, number> = {};
+    const hasProjectConfig = taiOrders.length > 0;
 
-      // 直接依據陣列的順序 (Index) 分配權重
-      taiOrders.forEach((item, index) => {
-        let assignedWeight = 0.04; // 預設給最後梯隊 (第 8~11 名)
+    // 檢查是否有至少一個 weight 被設定（非 null / undefined）
+    const hasUserDefinedWeights = taiOrders.some(
+      (item) => item.weight !== null && item.weight !== undefined
+    );
 
-        if (index < 4) {
-            // 第 1 ~ 4 名 (Index 0, 1, 2, 3) -> 0.15
-            assignedWeight = 0.15;
-        } else if (index < 7) {
-            // 第 5 ~ 7 名 (Index 4, 5, 6) -> 0.08
-            assignedWeight = 0.08;
-        } 
-        // 第 8 名以後 (Index 7+) -> 0.04
-
-        weightMap[item.indicator] = assignedWeight;
-      });
+    if (hasProjectConfig) {
+      if (hasUserDefinedWeights) {
+        // ========= 模式 A：使用者有填 weight，且前端已正規化成 0~1 =========
+        taiOrders.forEach((item) => {
+          const w = item.weight;
+          const num = w !== null && w !== undefined ? Number(w) : 0;
+          weightMap[item.indicator] = !isNaN(num) ? num : 0;
+        });
+      } else {
+        // ========= 模式 B：使用者完全沒填 weight -> 11 軸等權重 =========
+        const equalWeight = taiOrders.length > 0 ? 1 / taiOrders.length : 0;
+        taiOrders.forEach((item) => {
+          weightMap[item.indicator] = equalWeight;
+        });
+      }
     }
 
-    // 開始計算加權平均
+    // -------------------- 開始計算加權平均 --------------------
     let totalWeightedScore = 0;
     let totalValidWeight = 0;
 
-    // 遍歷所有計算出來的軸分數
     for (const [axis, score] of Object.entries(taiScores)) {
-        // 遇到 N/A (-1) 或 NaN，直接跳過 (不計入分子，也不計入分母)
-        if (score === -1 || isNaN(score)) {
-            continue;
-        }
+      // 遇到 N/A (-1) 或 NaN，直接跳過
+      if (score === -1 || isNaN(score)) {
+        continue;
+      }
 
-        // 決定該軸的權重
-        let weight = 1; // 若無專案設定，預設權重為 1 (算術平均)
-        
-        if (hasCustomWeights) {
-            // 如果該軸有在排序設定中，取出分配好的權重
-            // 若該軸不在 taiOrders 裡 (異常狀況)，這裡視為 0 或給予最低權重
-            weight = weightMap[axis] ?? 0; 
-        }
+      let weight: number;
 
-        // 分子累加：分數 * 權重
-        totalWeightedScore += (score * weight);
-        // 分母累加：有效權重
-        totalValidWeight += weight;
+      if (hasProjectConfig && Object.keys(weightMap).length > 0) {
+        // 有專案設定（自訂權重或等權重），若沒找到就當 0
+        weight = weightMap[axis] ?? 0;
+      } else {
+        // 完全沒有 taiOrders 設定 -> 純算術平均
+        weight = 1;
+      }
+
+      if (weight <= 0) continue;
+
+      totalWeightedScore += score * weight;
+      totalValidWeight += weight;
     }
 
-    // 計算最終總分
-    const overallScore = totalValidWeight > 0 
-        ? totalWeightedScore / totalValidWeight 
-        : 0;
+    const overallScore =
+      totalValidWeight > 0 ? totalWeightedScore / totalValidWeight : 0;
 
-    // 準備要存入 DB 的 Snapshot (這裡存的就是我們剛剛分配好的 0.15/0.08/0.04)
-    const taiWeightSnapshot = hasCustomWeights ? weightMap : null;
+    // --------- 權重快照：存「正規化後」的權重（和為 1），若沒有設定就存 null ---------
+    let taiWeightSnapshot: Record<string, number> | null = null;
 
-    console.log("TAI scores:", taiScores); 
-    console.log("Weight Map (Assigned by Order):", weightMap);
+    if (hasProjectConfig && Object.keys(weightMap).length > 0) {
+      // 為了保險起見，再把 weightMap 正規化一次（避免浮點誤差）
+      const sumWeights = Object.values(weightMap).reduce(
+        (acc, v) => acc + (isNaN(v) ? 0 : v),
+        0
+      );
+
+      if (sumWeights > 0) {
+        taiWeightSnapshot = Object.fromEntries(
+          Object.entries(weightMap).map(([k, v]) => [k, v / sumWeights])
+        );
+      } else {
+        taiWeightSnapshot = weightMap;
+      }
+    }
+
+    console.log("TAI scores:", taiScores);
+    console.log("Weight Map (final used):", weightMap);
     console.log("Total Weighted Score:", totalWeightedScore);
     console.log("Total Valid Weight:", totalValidWeight);
     console.log("Overall Score (Weighted):", overallScore);
