@@ -173,8 +173,15 @@ router.get('/:vid', responseController.getResponsesByVersionId);
  * @openapi
  * /api/response/{id}:
  *   patch:
- *     summary: Update an existing response (answers)
+ *     summary: Update an existing response (supports SCALE / TEXT / SINGLE_CHOICE / MULTIPLE_CHOICE)
  *     tags: [Response]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 12
  *     requestBody:
  *       required: true
  *       content:
@@ -186,18 +193,41 @@ router.get('/:vid', responseController.getResponsesByVersionId);
  *                 type: array
  *                 items:
  *                   type: object
+ *                   required:
+ *                     - questionId
  *                   properties:
  *                     questionId:
  *                       type: integer
+ *                       example: 3
  *                     value:
  *                       type: integer
+ *                       nullable: true
+ *                       description: Numeric value for SCALE questions
+ *                       example: 80
  *                     textValue:
  *                       type: string
+ *                       nullable: true
+ *                       description: Text answer for TEXT questions
+ *                       example: "模型在極端輸入會變得不穩定"
  *                     optionId:
  *                       type: integer
+ *                       nullable: true
+ *                       description: Single choice option for SINGLE_CHOICE
+ *                       example: 2
+ *                     optionIds:
+ *                       type: array
+ *                       nullable: true
+ *                       description: Array of option IDs for MULTIPLE_CHOICE
+ *                       items:
+ *                         type: integer
+ *                       example: [1, 3, 6]
  *     responses:
  *       200:
  *         description: Response updated successfully
+ *       400:
+ *         description: Invalid payload
+ *       404:
+ *         description: Response not found
  */
 router.patch('/:id', responseController.updateResponse);
 
