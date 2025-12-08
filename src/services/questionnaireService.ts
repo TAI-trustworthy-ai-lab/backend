@@ -9,6 +9,7 @@ interface CreateQuestionnairePayload {
   description?: string;
   questions: {
     text: string;
+    description?: string;
     category: string; // TAIIndicator
     order: number;
     type?: string; // 新增題型
@@ -67,6 +68,7 @@ export const createQuestionnaire = async (data: CreateQuestionnairePayload) => {
           // 建立題目與選項
           return {
             text: q.text,
+            description: q.description,
             category: q.category as any,
             order: q.order,
             type: type as any,
@@ -263,6 +265,7 @@ export const duplicateQuestionnaireById = async (
       questions: {
         create: original.questions.map((q) => ({
           text: q.text,
+          description: q.description,
           category: q.category,
           order: q.order,
           type: q.type,

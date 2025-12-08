@@ -26,6 +26,7 @@
  *                   type: object
  *                   properties:
  *                     text: { type: string }
+ *                     description: { type: string, example: “題目額外説明”, nullable: true }
  *                     category:
  *                       type: string
  *                       enum: [ACCURACY, RELIABILITY, SAFETY, RESILIENCE, TRANSPARENCY, ACCOUNTABILITY, EXPLAINABILITY, AUTONOMY, PRIVACY, FAIRNESS, SECURITY]
