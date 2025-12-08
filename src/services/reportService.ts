@@ -7,7 +7,155 @@ import { loadPromptConfig } from "../config/promptConfig";
 
 const prisma = new PrismaClient();
 
+// ---------------------------------------------
+// 額外：每題狀態分類（用 type，不用 interface）
+// ---------------------------------------------
+type QuestionStatus = "FULLY_MET" | "MOSTLY_MET" | "PARTIALLY_MET" | "NOT_MET" | "NA";
+
+// 顯示用：指標名稱對照（可以之後再調整）
+const axisDisplayName: Record<string, string> = {
+  SAFETY: "安全性 Safety",
+  PRIVACY: "隱私保護 Privacy",
+  ACCURACY: "準確性 Accuracy",
+  AUTONOMY: "自主性 Autonomy",
+  FAIRNESS: "公平性 Fairness",
+  SECURITY: "資安防護 Security",
+  RESILIENCE: "韌性 Resilience",
+  RELIABILITY: "可靠性 Reliability",
+  TRANSPARENCY: "透明性 Transparency",
+  ACCOUNTABILITY: "問責性 Accountability",
+  EXPLAINABILITY: "可解釋性 Explainability",
+};
+
+// 小工具：把某一個軸的所有題目資料，轉成一段「有結構的」報告文字（Markdown）
+function buildAxisStatsText(
+  axis: string,
+  items: {
+    order: number;
+    questionText: string;
+    status: QuestionStatus;
+    isNo: boolean;
+  }[]
+): string {
+  const displayName = axisDisplayName[axis] ?? axis;
+
+  const fully = items.filter((q) => q.status === "FULLY_MET");
+  const mostly = items.filter((q) => q.status === "MOSTLY_MET");
+  const partially = items.filter((q) => q.status === "PARTIALLY_MET");
+  const notMet = items.filter((q) => q.status === "NOT_MET");
+  const na = items.filter((q) => q.status === "NA");
+  const noItems = items.filter((q) => q.isNo);
+
+  const total = items.length;
+  const included = total - na.length;
+
+  const lines: string[] = [];
+
+  // === 標題 & 整體統計 ===
+  lines.push(`**${displayName} 填答統計** ➡️ 被採計題目數：${included}/${total} 題`);
+  lines.push("");
+
+  // 小工具：產生一個分類區塊（標題 + 題目清單）
+  const pushQuestionBlock = (
+    title: string,
+    icon: string,
+    arr: { order: number; questionText: string }[]
+  ) => {
+    if (!arr || arr.length === 0) return;
+    const sorted = [...arr].sort((a, b) => a.order - b.order);
+
+    lines.push(`**${icon} ${title}（${sorted.length} 題）**`);
+    sorted.forEach((q) => {
+      lines.push(`- Q${q.order}. ${q.questionText}`);
+    });
+    lines.push("");
+  };
+
+  // === 各分類詳細清單 ===
+  pushQuestionBlock("有做到的題目", "✅", fully);
+  pushQuestionBlock("大部分做到的題目", "🟡", mostly);
+  pushQuestionBlock("部分做到的題目", "🟠", partially);
+  pushQuestionBlock("尚未做到的題目", "❌", notMet);
+  pushQuestionBlock("不適用的題目", "🚫", na);
+
+  return lines.join("\n");
+}
+
 export class ReportService {
+  /**
+   * 從一個 Response（含 answers / question / option）建立各指標的填答統計 Markdown
+   */
+  buildQuestionStatsFromResponse(response: any): Record<string, string> {
+    const axisQuestionsMap: Record<
+      string,
+      { order: number; questionText: string; status: QuestionStatus; isNo: boolean }[]
+    > = {};
+
+    for (const a of response.answers ?? []) {
+      let scoreRaw: number | null = null;
+
+      if (a.value !== null && a.value !== undefined) {
+        scoreRaw = Number(a.value);
+      } else if (
+        a.option &&
+        a.option.value !== null &&
+        a.option.value !== undefined
+      ) {
+        scoreRaw = Number(a.option.value);
+      }
+
+      // 完全沒有數值（例如純文字問答）就先略過，不列入統計
+      if (scoreRaw === null || isNaN(scoreRaw)) continue;
+
+      const axis = a.question.category;
+      const order = a.question.order;
+      const questionText = a.question.text;
+      const optionText = a.option ? a.option.text : "";
+
+      // 判斷「是否為否」
+      const normalizedOption = optionText.trim();
+      const isNo =
+        normalizedOption === "否" ||
+        normalizedOption === "No" ||
+        normalizedOption === "NO" ||
+        normalizedOption === "no";
+
+      // 判斷分數區間
+      let status: QuestionStatus;
+      if (scoreRaw === -1) {
+        status = "NA";
+      } else {
+        const scoreNormalized = scoreRaw / 100;
+        if (scoreNormalized >= 0.8) {
+          status = "FULLY_MET";
+        } else if (scoreNormalized >= 0.6) {
+          status = "MOSTLY_MET";
+        } else if (scoreNormalized >= 0.4) {
+          status = "PARTIALLY_MET";
+        } else {
+          status = "NOT_MET";
+        }
+      }
+
+      if (!axisQuestionsMap[axis]) {
+        axisQuestionsMap[axis] = [];
+      }
+      axisQuestionsMap[axis].push({
+        order,
+        questionText,
+        status,
+        isNo,
+      });
+    }
+
+    const questionStatsText: Record<string, string> = {};
+    for (const [axis, items] of Object.entries(axisQuestionsMap)) {
+      questionStatsText[axis] = buildAxisStatsText(axis, items);
+    }
+
+    return questionStatsText;
+  }
+
   /**
    * 為指定 responseId 生成（或更新）一份 Report：
    * 1. 從 Response + Answer 計算各軸 TAI 分數 (0–1)
@@ -23,8 +171,7 @@ export class ReportService {
         answers: { include: { question: true, option: true } },
         project: {
           include: {
-            // 既然 taiOrders 本身就有順序，我們直接讀取即可
-            taiOrders: true, 
+            taiOrders: true,
           },
         },
       },
@@ -34,32 +181,45 @@ export class ReportService {
       throw new Error("Response not found");
     }
 
-    // 2) 整理答案 -> { axis, value }
-    const cleanedAnswers = response.answers.map((a) => {
-      let score: number | null = null;
+    // ============================================================
+    // 2) 整理答案 -> { axis, value }（給 TAI 分數用）
+    // ============================================================
+    const cleanedAnswers = response.answers
+      .map((a) => {
+        let score: number | null = null;
 
-      if (a.value !== null && a.value !== undefined) {
-        score = Number(a.value);
-      } else if (a.option && a.option.value !== null && a.option.value !== undefined) {
-        score = Number(a.option.value);
-      }
+        if (a.value !== null && a.value !== undefined) {
+          score = Number(a.value);
+        } else if (
+          a.option &&
+          a.option.value !== null &&
+          a.option.value !== undefined
+        ) {
+          score = Number(a.option.value);
+        }
 
-      // -1 表示 N/A，回傳 null 讓後面過濾掉
-      if (score === -1) score = -1; 
-      if (score === null) return null; 
+        // -1 表示 N/A，仍保留給 computeTAIScores 處理
+        if (score === null) return null;
 
-      return {
-        axis: a.question.category,
-        value: score, 
-      };
-    })  
-    .filter((item): item is { axis: string; value: number } => item !== null);
+        return {
+          axis: a.question.category,
+          value: score,
+        };
+      })
+      .filter(
+        (item): item is { axis: string; value: number } => item !== null
+      );
 
     // 3) 計算各軸平均分數 (0–1, 或 -1 表示 N/A)
     const taiScores = computeTAIScores(cleanedAnswers);
 
     // 4) 轉成 radarData 給前端畫圖用
     const radarData = computeRadarData(taiScores);
+
+    // ============================================================
+    // 2-2) 題目層級統計：組成後端直接輸出的 Markdown 字串
+    // ============================================================
+    const questionStatsText = this.buildQuestionStatsFromResponse(response);
 
     // ============================================================
     // 5) 準備權重 Snapshot & 計算 Overall Score
@@ -148,14 +308,14 @@ export class ReportService {
     console.log("Total Valid Weight:", totalValidWeight);
     console.log("Overall Score (Weighted):", overallScore);
 
-    // 6) 建立 LLM prompt 
+    // 6) 建立 LLM prompt
     const prompt = this.buildLLMPrompt(taiScores);
 
     // 7) 呼叫 LLM
     const analysisText = await callLLM(prompt);
 
     // 8) upsert 進 Report table
-    const modelUsed = "openai/gpt-oss-20b:free"; 
+    const modelUsed = "openai/gpt-oss-20b:free";
 
     const reportRecord = await prisma.report.upsert({
       where: { responseId },
@@ -201,6 +361,8 @@ export class ReportService {
       scores: taiScores,
       overallScore,
       analysisText,
+      // ⭐ 每個指標對應的一段 Markdown 統計文字
+      questionStatsText,
     };
   }
 
@@ -215,20 +377,20 @@ export class ReportService {
       console.error("FAILED TO LOAD prompt.json:", err);
       promptConfig = {};
     }
-    
+
     const background = promptConfig?.background ?? "";
 
     const axisStatus: string[] = [];
-    
+
     // 過濾掉 -1 (N/A) 的軸，只對有效軸排序
     const validScores = Object.entries(scores)
-        .filter(([, score]) => score !== -1 && !isNaN(score))
-        .sort(([, a], [, b]) => b - a);
-    
+      .filter(([, score]) => score !== -1 && !isNaN(score))
+      .sort(([, a], [, b]) => b - a);
+
     for (const [axis, score] of validScores) {
       const percentage = (score * 100).toFixed(0);
       let status: string;
-      
+
       if (score >= 0.8) {
         status = `[完全符合] ${axis}：達成度 ${percentage}%`;
       } else if (score >= 0.6) {
@@ -245,12 +407,12 @@ export class ReportService {
     if (naAxes.length > 0) {
       axisStatus.push(`\n以下面向因問答數量為零，標註為「不適用 (N/A)」：`);
       naAxes.forEach(([axis]) => {
-          axisStatus.push(`[不適用] ${axis}`);
+        axisStatus.push(`[不適用] ${axis}`);
       });
     }
-    
-    const statusList = axisStatus.join('\n* ');
-    
+
+    const statusList = axisStatus.join("\n* ");
+
     return `
 ${background}
 
