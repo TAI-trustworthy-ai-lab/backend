@@ -497,6 +497,8 @@ export async function updateResponse(
     }
 
     return updated;
+  },{
+    timeout: 8000,
   });
 }
 

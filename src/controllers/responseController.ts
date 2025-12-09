@@ -147,6 +147,16 @@ export const updateResponse = async (req: Request, res: Response) => {
     const updated = await responseService.updateResponse(id, answers);
     return sendSuccessResponse(res, updated);
   } catch (error) {
+
+    // 處理 Prisma 超時錯誤
+    if (error.code === "P2034") {
+      return res.status(408).json({
+        success: false,
+        message: "資料庫處理逾時，請稍後再試。",
+        hint: "PATCH 更新題目過多或同時多人編輯。",
+      });
+    }
+
     return sendErrorResponse(
       res,
       error instanceof Error ? error.message : String(error)
