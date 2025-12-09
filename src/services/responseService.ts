@@ -255,42 +255,43 @@ export async function updateResponse(
   responseId: number,
   answers: AnswerPatchInput[]
 ) {
-  return prisma.$transaction(async (tx) => {
-    // 1) 找出這份 Response + 對應問卷版本的所有 Questions
-    const response = await tx.response.findUnique({
-      where: { id: responseId },
-      include: {
-        version: {
-          include: { questions: true },
-        },
+  // 1) 先查出這份 response + 對應 questionnaire 的所有題目（不用 transaction）
+  const response = await prisma.response.findUnique({
+    where: { id: responseId },
+    include: {
+      version: {
+        include: { questions: true },
       },
-    });
+    },
+  });
 
-    if (!response) {
-      throw new Error("Response not found");
+  if (!response) {
+    throw new Error("Response not found");
+  }
+
+  // 建立 questionId -> Question 的 map，讓後面快速查
+  const questionMap = new Map<number, Question>();
+  for (const q of response.version.questions) {
+    questionMap.set(q.id, q as Question);
+  }
+
+  // 2) 逐題處理，每題一個短 transaction
+  for (const input of answers) {
+    const { questionId, value, optionId, optionIds, textValue } = input;
+
+    if (!questionId || typeof questionId !== "number") {
+      throw new Error("Each answer must have a valid questionId");
     }
 
-    // 把 questions 做成 Map<questionId, Question>
-    const questionMap = new Map<number, Question>();
-    for (const q of response.version.questions) {
-      questionMap.set(q.id, q);
+    const question = questionMap.get(questionId);
+    if (!question) {
+      throw new Error(
+        `Question ${questionId} does not belong to this response's questionnaire version`
+      );
     }
 
-    // 2) 逐題處理 PATCH 傳進來的 answers
-    for (const input of answers) {
-      const { questionId, value, optionId, optionIds, textValue } = input;
-
-      if (!questionId || typeof questionId !== "number") {
-        throw new Error("Each answer must have a valid questionId");
-      }
-
-      const question = questionMap.get(questionId);
-      if (!question) {
-        throw new Error(
-          `Question ${questionId} does not belong to this response's questionnaire version`
-        );
-      }
-
+    //每一題獨立 transaction
+    await prisma.$transaction(async (tx) => {
       switch (question.type) {
         // ======================
         // 1) SCALE 題：一題一筆，用 value
@@ -475,29 +476,29 @@ export async function updateResponse(
           );
         }
       }
-    }
+    }); // ← 這一題的 transaction 結束（成功就 commit，錯就 rollback 然後整個 updateResponse throw）
+  }
 
-    // 3) 回傳更新後的 Response（含 answers.question / answers.option）
-    const updated = await tx.response.findUnique({
-      where: { id: responseId },
-      include: {
-        answers: {
-          include: {
-            question: true,
-            option: {select: { id: true, text: true, value: true } }
-          },
+  // 3) 全部題目處理完後，再查一次最新的 response 回傳給前端
+  const updated = await prisma.response.findUnique({
+    where: { id: responseId },
+    include: {
+      answers: {
+        include: {
+          question: true,
+          option: { select: { id: true, text: true, value: true } },
         },
-        project: true,
-        version: true,
       },
-    });
-
-    if (!updated) {
-      throw new Error("Response disappeared after update (unexpected)");
-    }
-
-    return updated;
+      project: true,
+      version: true,
+    },
   });
+
+  if (!updated) {
+    throw new Error("Response disappeared after update (unexpected)");
+  }
+
+  return updated;
 }
 
 /**
