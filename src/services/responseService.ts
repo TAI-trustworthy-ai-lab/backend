@@ -355,7 +355,7 @@ export async function updateResponse(
                 responseId,
                 questionId,
                 optionId,
-                value: null,
+                value: opt.value ?? null,
                 textValue: null,
               },
             });
@@ -484,7 +484,7 @@ export async function updateResponse(
         answers: {
           include: {
             question: true,
-            option: true,
+            option: {select: { id: true, text: true, value: true } }
           },
         },
         project: true,
