@@ -4,7 +4,7 @@ import HttpStatusCode from '../utils/HttpStatusCode';
 import { sendSuccessResponse, sendErrorResponse, sendNotFoundResponse, sendSuccessNoDataResponse } from '../utils/responseHandler';
 import { UserService } from '../services/userService';
 import { CreateUserRequest, UserResponse } from '@src/types/userTypes';
-import { generateToken } from '../utils/jwtHandler';
+//import { generateToken } from '../utils/jwtHandler';
 import { userSchema } from '../types/zod';
 
 export const createUserController = async (req: Request, res: Response): Promise<void> => {
@@ -149,7 +149,8 @@ export const updateUserController = async (req: Request, res: Response): Promise
     const { name } = req.body;
 
     if (req.user.role !== 'ADMIN' && req.user.id !== Number(id)) {
-      return sendErrorResponse(res, "You can only update your own profile", 403);
+      sendErrorResponse(res, "You can only update your own profile", 403);
+      return;
     }
 
     const user = await UserService.findUserById(Number(id));
