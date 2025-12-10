@@ -120,7 +120,17 @@ export const getResponsesByProjectId = async (req: Request, res: Response) => {
  * update an existing response (update answers)
  * 更新作答的內容
  * path param: :id
- * body: { answers: [{ questionId, value, textValue, optionId }] }
+ * body: {
+ *   answers: [
+ *     { questionId, value? , textValue?, optionId?, optionIds? }
+ *   ]
+ * }
+ *
+ * 說明：
+ * - SCALE          問題：用 value
+ * - SINGLE_CHOICE  問題：用 optionId
+ * - MULTIPLE_CHOICE問題：用 optionIds (number[])，代表目前勾選的全部選項
+ * - TEXT           問題：用 textValue
  */
 export const updateResponse = async (req: Request, res: Response) => {
   try {
@@ -137,6 +147,7 @@ export const updateResponse = async (req: Request, res: Response) => {
     const updated = await responseService.updateResponse(id, answers);
     return sendSuccessResponse(res, updated);
   } catch (error) {
+    
     return sendErrorResponse(
       res,
       error instanceof Error ? error.message : String(error)

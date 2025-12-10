@@ -1,5 +1,5 @@
 // src/services/responseService.ts
-import { PrismaClient, QuestionType } from '@prisma/client';
+import { PrismaClient, QuestionType, Question } from "@prisma/client";
 const prisma = new PrismaClient();
 
 /**
@@ -237,38 +237,269 @@ export const getResponsesByProjectId = async (projectId: number) => {
   });
 };
 
-/**
- * 更新作答內容（答案）
- */
-export const updateResponse = async (
-  id: number,
-  answers: {
-    questionId: number;
-    value?: number;
-    textValue?: string;
-    optionId?: number;
-  }[]
-) => {
-  // 先刪除舊的 answers，再重新建立
-  await prisma.answer.deleteMany({ where: { responseId: id } });
+// 前端 PATCH /response/:id 時每一筆 answer 的型別
+export type AnswerPatchInput = {
+  questionId: number;
+  value?: number | null;
+  optionId?: number | null;
+  optionIds?: number[] | null; 
+  textValue?: string | null;
+};
 
-  // 重新寫入新答案
-  const updated = await prisma.response.update({
-    where: { id },
-    data: {
-      answers: { create: answers },
-      submittedAt: new Date(),
-    },
+/**
+ * 更新一份 Response 的答案
+ * - 支援 SCALE / SINGLE_CHOICE / MULTIPLE_CHOICE / TEXT
+ * - MULTIPLE_CHOICE: 用 optionIds 表示「目前勾選的全部選項」，會做上線/下線
+ */
+export async function updateResponse(
+  responseId: number,
+  answers: AnswerPatchInput[]
+) {
+  // 1) 先查出這份 response + 對應 questionnaire 的所有題目（不用 transaction）
+  const response = await prisma.response.findUnique({
+    where: { id: responseId },
     include: {
-      user: true,
-      project: true,
-      version: true,
-      answers: true,
+      version: {
+        include: { questions: true },
+      },
     },
   });
 
+  if (!response) {
+    throw new Error("Response not found");
+  }
+
+  // 建立 questionId -> Question 的 map，讓後面快速查
+  const questionMap = new Map<number, Question>();
+  for (const q of response.version.questions) {
+    questionMap.set(q.id, q as Question);
+  }
+
+  // 2) 逐題處理，每題一個短 transaction
+  for (const input of answers) {
+    const { questionId, value, optionId, optionIds, textValue } = input;
+
+    if (!questionId || typeof questionId !== "number") {
+      throw new Error("Each answer must have a valid questionId");
+    }
+
+    const question = questionMap.get(questionId);
+    if (!question) {
+      throw new Error(
+        `Question ${questionId} does not belong to this response's questionnaire version`
+      );
+    }
+
+    //每一題獨立 transaction
+    await prisma.$transaction(async (tx) => {
+      switch (question.type) {
+        // ======================
+        // 1) SCALE 題：一題一筆，用 value
+        // ======================
+        case QuestionType.SCALE: {
+          if (value === null || value === undefined) {
+            // 視為清空這題答案
+            await tx.answer.deleteMany({
+              where: { responseId, questionId },
+            });
+          } else {
+            const numericValue = Number(value);
+            if (isNaN(numericValue)) {
+              throw new Error(`Invalid value for SCALE question ${questionId}`);
+            }
+
+            // 保證這題只留一筆 Answer
+            await tx.answer.deleteMany({
+              where: { responseId, questionId },
+            });
+
+            await tx.answer.create({
+              data: {
+                responseId,
+                questionId,
+                value: numericValue,
+                optionId: null,
+                textValue: null,
+              },
+            });
+          }
+          break;
+        }
+
+        // ======================
+        // 2) SINGLE_CHOICE：一題一筆，用 optionId
+        // ======================
+        case QuestionType.SINGLE_CHOICE: {
+          if (!optionId) {
+            // 沒傳 / null -> 清空這題答案
+            await tx.answer.deleteMany({
+              where: { responseId, questionId },
+            });
+          } else {
+            // 確認 option 屬於該題
+            const opt = await tx.questionOption.findUnique({
+              where: { id: optionId },
+            });
+
+            if (!opt || opt.questionId !== questionId) {
+              throw new Error(
+                `Option ${optionId} does not belong to question ${questionId}`
+              );
+            }
+
+            await tx.answer.deleteMany({
+              where: { responseId, questionId },
+            });
+
+            await tx.answer.create({
+              data: {
+                responseId,
+                questionId,
+                optionId,
+                value: opt.value ?? null,
+                textValue: null,
+              },
+            });
+          }
+          break;
+        }
+
+        // ======================
+        // 3) MULTIPLE_CHOICE：用 optionIds，支援上線/下線
+        // ======================
+        case QuestionType.MULTIPLE_CHOICE: {
+          const ids = (optionIds ?? []).filter(
+            (id): id is number => typeof id === "number"
+          );
+
+          // 將當前 DB 中這題的答案查出來
+          const existingAnswers = await tx.answer.findMany({
+            where: { responseId, questionId },
+          });
+
+          const existingOptionIdSet = new Set(
+            existingAnswers
+              .map((a) => a.optionId)
+              .filter((id): id is number => typeof id === "number")
+          );
+
+          const targetOptionIdSet = new Set(ids);
+
+          // 3-1) 驗證：所有 target optionIds 都必須是這題的選項
+          if (targetOptionIdSet.size > 0) {
+            const options = await tx.questionOption.findMany({
+              where: {
+                id: { in: Array.from(targetOptionIdSet) },
+              },
+            });
+
+            const invalidOptionIds = Array.from(targetOptionIdSet).filter(
+              (id) => !options.some((opt) => opt.id === id && opt.questionId === questionId)
+            );
+
+            if (invalidOptionIds.length > 0) {
+              throw new Error(
+                `Some optionIds do not belong to question ${questionId}: [${invalidOptionIds.join(
+                  ", "
+                )}]`
+              );
+            }
+          }
+
+          // 3-2) 下線：DB 有，但不在新的選擇中 -> deleteMany
+          const optionIdsToRemove = Array.from(existingOptionIdSet).filter(
+            (id) => !targetOptionIdSet.has(id)
+          );
+
+          if (optionIdsToRemove.length > 0) {
+            await tx.answer.deleteMany({
+              where: {
+                responseId,
+                questionId,
+                optionId: { in: optionIdsToRemove },
+              },
+            });
+          }
+
+          // 3-3) 上線：新的選擇裡有，但 DB 裡沒有 -> createMany
+          const optionIdsToAdd = Array.from(targetOptionIdSet).filter(
+            (id) => !existingOptionIdSet.has(id)
+          );
+
+          if (optionIdsToAdd.length > 0) {
+            await tx.answer.createMany({
+              data: optionIdsToAdd.map((oid) => ({
+                responseId,
+                questionId,
+                optionId: oid,
+                value: null,
+                textValue: null,
+              })),
+            });
+          }
+
+          // 若 optionIds 是空陣列 => 全部 Answer 被刪光，表示「目前沒勾任何選項」
+          break;
+        }
+
+        // ======================
+        // 4) TEXT 題：一題一筆，用 textValue
+        // ======================
+        case QuestionType.TEXT: {
+          const finalText = textValue ?? "";
+
+          if (finalText.trim() === "") {
+            await tx.answer.deleteMany({
+              where: { responseId, questionId },
+            });
+          } else {
+            await tx.answer.deleteMany({
+              where: { responseId, questionId },
+            });
+
+            await tx.answer.create({
+              data: {
+                responseId,
+                questionId,
+                textValue: finalText,
+                value: null,
+                optionId: null,
+              },
+            });
+          }
+          break;
+        }
+
+        default: {
+          throw new Error(
+            `Unsupported QuestionType ${question.type} for question ${questionId}`
+          );
+        }
+      }
+    }); // ← 這一題的 transaction 結束（成功就 commit，錯就 rollback 然後整個 updateResponse throw）
+  }
+
+  // 3) 全部題目處理完後，再查一次最新的 response 回傳給前端
+  const updated = await prisma.response.findUnique({
+    where: { id: responseId },
+    include: {
+      answers: {
+        include: {
+          question: true,
+          option: { select: { id: true, text: true, value: true } },
+        },
+      },
+      project: true,
+      version: true,
+    },
+  });
+
+  if (!updated) {
+    throw new Error("Response disappeared after update (unexpected)");
+  }
+
   return updated;
-};
+}
 
 /**
  * 刪除一份作答
