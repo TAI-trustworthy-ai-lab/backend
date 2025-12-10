@@ -420,7 +420,7 @@ ${background}
 
 * ${statusList}
 
-請根據您作為「可信任 AI 顧問」的角色，並依據 System Prompt 中要求的格式（改善建議段落 + Markdown 表格計畫），輸出分析報告。
+請根據您作為「可信任 AI 顧問」的角色，並依據 System Prompt 中要求的格式（改善建議段落 + Markdown 表格計畫），輸出分析報告(請用繁體中文回答)。
     `;
   }
 }

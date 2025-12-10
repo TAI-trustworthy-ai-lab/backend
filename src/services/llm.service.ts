@@ -1,4 +1,4 @@
-// src/services/llm.service.ts (修正版：使用 OpenRouter)
+// src/services/llm.service.ts (修正版：System Prompt 使用中文)
 
 import axios from 'axios';
 import * as dotenv from 'dotenv';
@@ -19,15 +19,21 @@ const FALLBACK_MODEL = "google/gemma-2-9b-it:free"; // 備援模型
  */
 export async function generateLlmResponse(userMessage: string): Promise<string> {
     
-    // 這裡我們假設 systemPrompt 是固定的或從環境變數讀取，
-    // 以避免在聊天服務中引入太多問卷報告的配置。
-    const systemPrompt = process.env.CHAT_SYSTEM_PROMPT || "You are a helpful and concise AI assistant.";
+    // 原來的 System Prompt 基礎
+    const baseSystemPrompt = process.env.CHAT_SYSTEM_PROMPT || "您是一個樂於助人且簡潔的 AI 助理。";
+
+    // **【修正點：在 System Prompt 中加入中文語言指令】**
+    const languageInstruction = "如果使用者是用中文提問，請一律使用繁體中文（Traditional Chinese）回答；如果使用者是用其他語言（如英文）提問，請用該語言（英文）回答。";
+    
+    // 合併最終的 System Prompt
+    const systemPrompt = baseSystemPrompt + " " + languageInstruction;
 
     const payload = {
         model: DEFAULT_MODEL,
         messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userMessage },
+            // **【Prompt 位置：System Role】**
+            { role: "system", content: systemPrompt }, 
+            { role: "user", content: userMessage }, // 用戶輸入
         ],
     };
 
@@ -50,10 +56,7 @@ export async function generateLlmResponse(userMessage: string): Promise<string> 
         return llmAnswer.trim();
 
     } catch (err: any) {
-        // 這裡可以加入模型切換邏輯，但為了與 reportService 區分，我們只做一次失敗處理
         console.error(`[LLM Service Error] Model failed: ${err.message}`, err.response?.data);
-        
-        // 拋出錯誤給 Controller 處理
         throw new Error(`Failed to generate response using ${DEFAULT_MODEL}. Please check API key and network connection.`);
     }
 }
