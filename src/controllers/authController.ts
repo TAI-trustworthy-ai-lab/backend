@@ -181,10 +181,12 @@ export const resendVerification = async (req: Request, res: Response) => {
       });
     }
 
+    const cooldown = 60 * 1000;
+
     // 限制：5 分鐘內不能重送
     if (user.verifyTokenExp && user.verifyTokenExp > new Date()) {
       const waitSeconds = Math.ceil(
-        (user.verifyTokenExp.getTime() - Date.now()) / 1000
+        (user.verifyTokenExp.getTime() - (Date.now() + (10*60*1000 - cooldown))) / 1000
       );
       return sendErrorResponse(
         res,
