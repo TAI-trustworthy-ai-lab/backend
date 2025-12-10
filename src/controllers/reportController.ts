@@ -12,14 +12,23 @@ const prisma = new PrismaClient();
 export const generateReport = async (req: Request, res: Response): Promise<void> => {
   try {
     const responseId = Number(req.params.responseId);
+
     if (isNaN(responseId)) {
       sendErrorResponse(res, "Invalid responseId", 400);
       return;
     }
 
     const result = await reportService.generateReport(responseId);
+    // ⭐ 將回傳形狀「攤平」成原本前端習慣用的 Report 形狀 + 新增 questionStatsText
+    const payload = {
+      ...result.report,          // id, responseId, overallScore, generatedAt, radarData, taiWeightSnapshot, llmMeta, response, images
+      overallScore: result.overallScore, // 保險起見，用最新計算的
+      analysisText: result.analysisText, // 也是用最新 LLM 內容
+      radarData: result.report.radarData, // DB 內已是最新 taiScores（0~1 或 -1）
+      questionStatsText: result.questionStatsText, // ⭐ 新增的統計文字
+    };
 
-    sendSuccessResponse(res, result, 201);
+    sendSuccessResponse(res, payload, 201);
   } catch (error: any) {
     sendErrorResponse(res, error.message);
   }
@@ -32,6 +41,12 @@ export const getReportByResponseId = async (req: Request, res: Response): Promis
   try {
     const responseId = Number(req.params.responseId);
 
+    if (isNaN(responseId)) {
+      sendErrorResponse(res, "Invalid responseId", 400);
+      return;
+    }
+
+    // 1) 先嘗試從資料庫找到已經存在的 report
     const report = await prisma.report.findUnique({
       where: { responseId },
       include: {
@@ -55,11 +70,31 @@ export const getReportByResponseId = async (req: Request, res: Response): Promis
       return;
     }
 
-    sendSuccessResponse(res, report);
+    // 2) 有現成的 report：不再呼叫 LLM，只需要計算 questionStatsText 給前端
+    const responseEntity = await prisma.response.findUnique({
+      where: { id: responseId },
+      include: {
+        answers: { include: { question: true, option: true } },
+      },
+    });
+
+    let questionStatsText: Record<string, string> = {};
+
+    if (responseEntity) {
+      questionStatsText = reportService.buildQuestionStatsFromResponse(responseEntity);
+    }
+
+    const payload = {
+      ...report,
+      questionStatsText,
+    };
+
+    sendSuccessResponse(res, payload);
   } catch (error: any) {
     sendErrorResponse(res, error.message);
   }
 };
+
 
 /**
  * Add an image to a report

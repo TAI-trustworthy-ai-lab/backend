@@ -4,6 +4,9 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 
+// 1. 這裡您已經引入了，很好
+import llmRouter from './routes/llm.router';
+
 import { notFoundHandler } from './middlewares/notFound';
 import { errorHandler } from './middlewares/errorHandler';
 import requestLogger from './middlewares/requestLogger';
@@ -28,13 +31,16 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(requestLogger);
 
-app.use('/api/auth', authRoutes);
+// --- 路由註冊區 ---
 
+app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/questionnaire', questionnaireRoutes);
 app.use('/api/response', responseRoutes);
 app.use('/api/project', projectRoutes);
 app.use('/api/report', reportRoutes);
+
+app.use('/api/llm', llmRouter); 
 
 app.get('/', (req: Request, res: Response) => {
   res.status(200).json({ message: '🎉 Bienvenue sur l\'API !' });
