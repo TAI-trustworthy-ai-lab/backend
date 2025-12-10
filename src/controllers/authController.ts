@@ -15,11 +15,9 @@ import {
 const prisma = new PrismaClient();
 
 /**
- * -------------------------
- *   Register (含 Email 驗證)
- * -------------------------
+ * register + email verification
  */
-export const register = async (req: Request, res: Response) => {
+export const register = async (req: Request, res: Response): Promise<void> => {
   try {
     const { name, email, password } = req.body;
 
@@ -27,7 +25,8 @@ export const register = async (req: Request, res: Response) => {
 
     // Email 已驗證 → 不能重複註冊
     if (existing && existing.emailVerified) {
-      return sendErrorResponse(res, "此 Email 已被註冊", 400);
+      sendErrorResponse(res, "此 Email 已被註冊", 400);
+      return;
     }
 
     // 產生 Email 驗證 token
@@ -63,19 +62,17 @@ export const register = async (req: Request, res: Response) => {
     const verifyUrl = `http://localhost:3001/api/auth/verify-email?token=${token}`;
     await sendVerificationEmail(email, verifyUrl);
 
-    return sendSuccessResponse(res, "驗證信已寄出，請至 Email 查收");
+    sendSuccessResponse(res, "驗證信已寄出，請至 Email 查收");
   } catch (err) {
     console.error("[register] Error:", err);
-    return sendErrorResponse(res, "註冊失敗", 500);
+    sendErrorResponse(res, "註冊失敗", 500);
   }
 };
 
 /**
- * -------------------------
- *   Verify Email (含前端 redirect)
- * -------------------------
+ * Verify Email
  */
-export const verifyEmail = async (req: Request, res: Response) => {
+export const verifyEmail = async (req: Request, res: Response): Promise<void> => {
   try {
     const { token } = req.query;
 
@@ -87,7 +84,8 @@ export const verifyEmail = async (req: Request, res: Response) => {
     });
 
     if (!user) {
-      return sendErrorResponse(res, "驗證連結無效或已過期", 400);
+      sendErrorResponse(res, "驗證連結無效或已過期", 400);
+      return;
     }
 
     await prisma.user.update({
@@ -99,48 +97,48 @@ export const verifyEmail = async (req: Request, res: Response) => {
       },
     });
 
-    return res.redirect("http://localhost:3000/verify-success");
+    res.redirect("http://localhost:3000/verify-success");
   } catch (err) {
     console.error("[verifyEmail] Error:", err);
-    return sendErrorResponse(res, "Email 驗證失敗", 500);
+    sendErrorResponse(res, "Email 驗證失敗", 500);
   }
 };
 
 /**
- * -------------------------
- *   Login（需要 Email 已驗證）
- * -------------------------
+ *   Login
  */
-export const login = async (req: Request, res: Response) => {
+export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return sendErrorResponse(res, "Email 和 password 都是必填", 400);
+      sendErrorResponse(res, "Email 和 password 都是必填", 400);
+      return;
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      return sendNotFoundResponse(res, "查無此使用者");
+      sendNotFoundResponse(res, "查無此使用者");
+      return;
     }
 
-    // 必須先驗證 Email
     if (!user.emailVerified) {
-      return sendErrorResponse(res, "請先至 Email 完成驗證後再登入", 403);
+      sendErrorResponse(res, "請先至 Email 完成驗證後再登入", 403);
+      return;
     }
 
     const isValid = await comparePasswords(password, user.hashedPassword);
     if (!isValid) {
-      return sendErrorResponse(res, "密碼錯誤", 401);
+      sendErrorResponse(res, "密碼錯誤", 401);
+      return;
     }
 
-    // 產生 JWT
     const token = generateToken(
       { id: user.id.toString(), role: user.role },
       "1h"
     );
 
-    return sendSuccessResponse(res, {
+    sendSuccessResponse(res, {
       token,
       user: {
         id: user.id,
@@ -149,53 +147,41 @@ export const login = async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("[login] Error:", err);
-    return sendErrorResponse(res, "登入失敗", 500);
+    sendErrorResponse(res, "登入失敗", 500);
   }
 };
 
 /**
- * ======================================================
- *  Resend Verification Email — 重送驗證信
- * ======================================================
+ * Resend Verification Email
  */
-export const resendVerification = async (req: Request, res: Response) => {
+export const resendVerification = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email } = req.body;
 
     if (!email) {
-      return sendErrorResponse(res, "Email 為必填欄位", 400);
+      sendErrorResponse(res, "Email 為必填欄位", 400);
+      return;
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+    const user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {
-      return sendNotFoundResponse(res, "查無此 Email 對應的使用者");
+      sendNotFoundResponse(res, "查無此 Email 對應的使用者");
+      return;
     }
 
-    // 已驗證：不需再寄
     if (user.emailVerified) {
-      return sendSuccessResponse(res, {
+      sendSuccessResponse(res, {
         message: "此 Email 已完成驗證，無需重送驗證信",
       });
+      return;
     }
 
-    const cooldown = 60 * 1000;
-
-    // 限制：5 分鐘內不能重送
     if (user.verifyTokenExp && user.verifyTokenExp > new Date()) {
-      const waitSeconds = Math.ceil(
-        (user.verifyTokenExp.getTime() - (Date.now() + (10*60*1000 - cooldown))) / 1000
-      );
-      return sendErrorResponse(
-        res,
-        `請稍後再試，剩餘 ${waitSeconds} 秒後可重新寄送驗證信`,
-        429
-      );
+      sendErrorResponse(res, "請稍後再試，驗證信正在冷卻中", 429);
+      return;
     }
 
-    // 產生新 Token（有效期 10 分鐘）
     const token = crypto.randomBytes(40).toString("hex");
     const expire = new Date(Date.now() + 10 * 60 * 1000);
 
@@ -207,13 +193,12 @@ export const resendVerification = async (req: Request, res: Response) => {
       },
     });
 
-    // 重送新驗證信
     const verifyUrl = `http://localhost:3001/api/auth/verify-email?token=${token}`;
     await sendVerificationEmail(email, verifyUrl);
 
-    return sendSuccessResponse(res, "驗證信已重新寄出，請至 Email 查收");
+    sendSuccessResponse(res, "驗證信已重新寄出，請至 Email 查收");
   } catch (err) {
     console.error("[resendVerification] Error:", err);
-    return sendErrorResponse(res, "重送驗證信失敗", 500);
+    sendErrorResponse(res, "重送驗證信失敗", 500);
   }
 };
