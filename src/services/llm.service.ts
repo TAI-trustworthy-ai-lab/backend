@@ -9,7 +9,7 @@ dotenv.config();
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_MODEL = "openai/gpt-oss-20b:free"; // 您指定的模型
-const FALLBACK_MODEL = "google/gemma-2-9b-it:free"; // 備援模型
+//const FALLBACK_MODEL = "google/gemma-2-9b-it:free";
 
 /**
  * 呼叫 OpenRouter API 取得 LLM 回應。
