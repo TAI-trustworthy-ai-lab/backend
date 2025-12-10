@@ -19,13 +19,13 @@ export const generateReport = async (req: Request, res: Response): Promise<void>
     }
 
     const result = await reportService.generateReport(responseId);
-    // ⭐ 將回傳形狀「攤平」成原本前端習慣用的 Report 形狀 + 新增 questionStatsText
+
     const payload = {
-      ...result.report,          // id, responseId, overallScore, generatedAt, radarData, taiWeightSnapshot, llmMeta, response, images
-      overallScore: result.overallScore, // 保險起見，用最新計算的
-      analysisText: result.analysisText, // 也是用最新 LLM 內容
-      radarData: result.report.radarData, // DB 內已是最新 taiScores（0~1 或 -1）
-      questionStatsText: result.questionStatsText, // ⭐ 新增的統計文字
+      ...result.report,
+      overallScore: result.overallScore,
+      analysisText: result.analysisText,
+      radarData: result.report.radarData,
+      questionStatsText: result.questionStatsText,
     };
 
     sendSuccessResponse(res, payload, 201);
@@ -46,7 +46,6 @@ export const getReportByResponseId = async (req: Request, res: Response): Promis
       return;
     }
 
-    // 1) 先嘗試從資料庫找到已經存在的 report
     const report = await prisma.report.findUnique({
       where: { responseId },
       include: {
@@ -63,14 +62,10 @@ export const getReportByResponseId = async (req: Request, res: Response): Promis
     });
 
     if (!report) {
-      res.status(404).json({
-        success: false,
-        message: "Report not found for this response.",
-      });
+      sendErrorResponse(res, "Report not found for this response.", 404);
       return;
     }
 
-    // 2) 有現成的 report：不再呼叫 LLM，只需要計算 questionStatsText 給前端
     const responseEntity = await prisma.response.findUnique({
       where: { id: responseId },
       include: {
@@ -94,7 +89,6 @@ export const getReportByResponseId = async (req: Request, res: Response): Promis
     sendErrorResponse(res, error.message);
   }
 };
-
 
 /**
  * Add an image to a report
