@@ -55,5 +55,7 @@ jobs:
             DB_PASSWORD='${{ secrets.DB_PASSWORD }}' \
             DB_NAME='${{ secrets.DB_NAME }}' \
             PROD_PORT='${{ secrets.PROD_PORT }}' \
+            RESEND_API_KEY='${{ secrets.RESEND_API_KEY }}' \
+            LLM_API_KEY='${{ secrets.LLM_API_KEY }}' \
             TAG=prod docker compose -f docker-compose.prod.yml up -d
           "
