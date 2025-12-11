@@ -1,0 +1,145 @@
+{
+  "info": {
+    "name": "TAI Assessment System API Tests",
+    "_postman_id": "tai-collection-001",
+    "description": "Working importable collection for VSCode Postman/Thunder Client",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+
+    {
+      "name": "Auth - Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"tatsiangchen@example.com\",\n  \"password\": \"12345678\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:3001/api/auth/login",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3001",
+          "path": ["api", "auth", "login"]
+        }
+      }
+    },
+
+    {
+      "name": "Questionnaire - All Versions",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:3001/api/questionnaire/all",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3001",
+          "path": ["api", "questionnaire", "all"]
+        }
+      }
+    },
+
+    {
+      "name": "Questionnaire - Latest Group Version",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:3001/api/questionnaire/group/latest",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3001",
+          "path": ["api", "questionnaire", "group", "latest"]
+        }
+      }
+    },
+
+    {
+      "name": "Questionnaire - Get Version 47",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:3001/api/questionnaire/version/47",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3001",
+          "path": ["api", "questionnaire", "version", "47"]
+        }
+      }
+    },
+
+    {
+      "name": "Response - Submit Success",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": 9,\n  \"projectId\": 5,\n  \"versionId\": 47,\n  \"answers\": [\n    { \"questionId\": 64, \"optionId\": 193, \"value\": 5 }\n  ]\n}"
+        },
+        "url": {
+          "raw": "http://localhost:3001/api/response",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3001",
+          "path": ["api", "response"]
+        }
+      }
+    },
+
+    {
+      "name": "Response - Submit (Rollback Error Test)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": 9,\n  \"projectId\": 5,\n  \"versionId\": 47,\n  \"answers\": [\n    { \"questionId\": 64, \"optionId\": 999999, \"value\": 5 }\n  ]\n}"
+        },
+        "url": {
+          "raw": "http://localhost:3001/api/response",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3001",
+          "path": ["api", "response"]
+        }
+      }
+    },
+
+    {
+      "name": "Report - Generate",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "http://localhost:3001/api/report/generate/1",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3001",
+          "path": ["api", "report", "generate", "1"]
+        }
+      }
+    },
+
+    {
+      "name": "Report - Get by Response",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "http://localhost:3001/api/report/response/1",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3001",
+          "path": ["api", "report", "response", "1"]
+        }
+      }
+    }
+  ]
+}

@@ -1,9 +1,22 @@
 // utils/taiRadar.ts
 
+export type TAIIndicator =
+  | "ACCURACY"
+  | "RELIABILITY"
+  | "SAFETY"
+  | "RESILIENCE"
+  | "TRANSPARENCY"
+  | "ACCOUNTABILITY"
+  | "EXPLAINABILITY"
+  | "AUTONOMY"
+  | "PRIVACY"
+  | "FAIRNESS"
+  | "SECURITY";
+
 /** TAI 分數 (0–1) */
 export function computeTAIScores(
-  answers: { axis: string; value: number }[]
-): Record<string, number> {
+  answers: { axis: TAIIndicator; value: number }[]
+): Record<TAIIndicator, number> {
   // 1. 先將所有原始分數 (包含 -1) 依照 axis 分組
   const byAxis: Record<string, number[]> = {};
 

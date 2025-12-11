@@ -11,14 +11,12 @@ export interface PromptConfig {
 let cachedPrompt: PromptConfig | null = null;
 
 export function loadPromptConfig(): PromptConfig {
-  console.log("Loading prompt.json ...");
-
-  if (cachedPrompt) return cachedPrompt;
+  if (cachedPrompt !== null) return cachedPrompt;
 
   const filePath = path.join(__dirname, "prompt.json");
-
   const raw = fs.readFileSync(filePath, "utf-8");
-  cachedPrompt = JSON.parse(raw);
+  const parsed = JSON.parse(raw);
 
-  return cachedPrompt;
+  cachedPrompt = parsed;
+  return parsed;
 }

@@ -4,7 +4,6 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 
-// 1. 這裡您已經引入了，很好
 import llmRouter from './routes/llm.router';
 
 import { notFoundHandler } from './middlewares/notFound';

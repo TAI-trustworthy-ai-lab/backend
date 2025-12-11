@@ -4,7 +4,7 @@ import HttpStatusCode from '../utils/HttpStatusCode';
 import { sendSuccessResponse, sendErrorResponse, sendNotFoundResponse, sendSuccessNoDataResponse } from '../utils/responseHandler';
 import { UserService } from '../services/userService';
 import { CreateUserRequest, UserResponse } from '@src/types/userTypes';
-import { generateToken } from '../utils/jwtHandler';
+//import { generateToken } from '../utils/jwtHandler';
 import { userSchema } from '../types/zod';
 
 export const createUserController = async (req: Request, res: Response): Promise<void> => {
@@ -25,14 +25,17 @@ export const createUserController = async (req: Request, res: Response): Promise
     const hashedPassword = await hashPassword(password);
     const newUser = await UserService.createUser({ name, email, hashedPassword });
 
-    const userResponse: UserResponse = {
-      id: newUser.id,
-      name: newUser.name,
-      email: newUser.email,
-      role: newUser.role,
-      createdAt: newUser.createdAt,
-      updatedAt: newUser.updatedAt,
-    };
+  const userResponse: UserResponse = {
+    id: newUser.id,
+    name: newUser.name,
+    email: newUser.email,
+    role: newUser.role,
+    createdAt: newUser.createdAt,
+    updatedAt: newUser.updatedAt,
+    emailVerified: newUser.emailVerified,
+    verifyToken: newUser.verifyToken,
+    verifyTokenExp: newUser.verifyTokenExp,
+  };
 
     sendSuccessResponse(res, userResponse, HttpStatusCode.CREATED);
   } catch (error) {
@@ -70,6 +73,9 @@ export const findAllUsersController = async (req: Request, res: Response): Promi
       role: user.role,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      emailVerified: user.emailVerified,
+      verifyToken: user.verifyToken,
+      verifyTokenExp: user.verifyTokenExp,
     }));
 
     sendSuccessResponse(res, usersResponse, HttpStatusCode.OK);
@@ -96,6 +102,9 @@ export const findUserByIdController = async (req: Request, res: Response): Promi
       role: user.role,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      emailVerified: user.emailVerified,
+      verifyToken: user.verifyToken,
+      verifyTokenExp: user.verifyTokenExp,
     };
 
     sendSuccessResponse(res, userResponse, HttpStatusCode.OK);
@@ -115,14 +124,17 @@ export const findUserByEmailController = async (req: Request, res: Response): Pr
       return;
     }
 
-    const userResponse: UserResponse = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    };
+  const userResponse: UserResponse = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    emailVerified: user.emailVerified,
+    verifyToken: user.verifyToken,
+    verifyTokenExp: user.verifyTokenExp,
+  };
 
     sendSuccessResponse(res, userResponse, HttpStatusCode.OK);
   } catch (error) {
@@ -137,7 +149,8 @@ export const updateUserController = async (req: Request, res: Response): Promise
     const { name } = req.body;
 
     if (req.user.role !== 'ADMIN' && req.user.id !== Number(id)) {
-      return sendErrorResponse(res, "You can only update your own profile", 403);
+      sendErrorResponse(res, "You can only update your own profile", 403);
+      return;
     }
 
     const user = await UserService.findUserById(Number(id));
