@@ -23,7 +23,7 @@ export async function generateLlmResponse(userMessage: string): Promise<string> 
     const baseSystemPrompt = process.env.CHAT_SYSTEM_PROMPT || "您是一個樂於助人且簡潔的 AI 助理。";
 
     // **【修正點：在 System Prompt 中加入中文語言指令】**
-    const languageInstruction = "如果使用者是用中文提問，請一律使用繁體中文（Traditional Chinese）回答；如果使用者是用其他語言（如英文）提問，請用該語言（英文）回答。";
+    const languageInstruction = "如果使用者是用中文提問，請一律使用繁體中文（Traditional Chinese）回答，請**必須**使用**繁體中文**進行輸出；如果使用者是用其他語言（如英文）提問，請用該語言（英文）回答。";
     
     // 合併最終的 System Prompt
     const systemPrompt = baseSystemPrompt + " " + languageInstruction;
