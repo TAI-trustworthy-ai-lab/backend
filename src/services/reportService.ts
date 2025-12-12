@@ -87,12 +87,14 @@ export class ReportService {
    * 依 Response 建立題目統計 Markdown
    */
   buildQuestionStatsFromResponse(response: any): Record<string, string> {
-    const axisMap: Record<
+    // axis -> questionId -> aggregated question
+    const axisQuestionMap: Record<
       string,
-      { order: number; questionText: string; status: QuestionStatus; isNo: boolean }[]
+      Map<number, { order: number; questionText: string; raw: number; isNo: boolean }>
     > = {};
 
     for (const a of response.answers ?? []) {
+      // 取分數 raw
       let raw: number | null = null;
 
       if (a.value !== undefined && a.value !== null) {
@@ -104,28 +106,72 @@ export class ReportService {
       if (raw === null || isNaN(raw)) continue;
 
       const axis = a.question.category as TAIIndicator;
+      const qid = a.questionId as number; // Prisma Answer.questionId
       const order = a.question.order;
       const text = a.question.text;
       const optionText = (a.option?.text ?? "").trim();
 
-      const isNo =
-        optionText === "否" ||
-        optionText.toLowerCase() === "no";
+      const isNo = optionText === "否" || optionText.toLowerCase() === "no";
 
-      let status: QuestionStatus;
+      if (!axisQuestionMap[axis]) axisQuestionMap[axis] = new Map();
 
-      if (raw === -1) {
-        status = "NA";
+      const existing = axisQuestionMap[axis].get(qid);
+
+      if (!existing) {
+        // 第一次看到這題
+        axisQuestionMap[axis].set(qid, {
+          order,
+          questionText: text,
+          raw,
+          isNo,
+        });
       } else {
-        const norm = raw / 100;
-        if (norm >= 0.8) status = "FULLY_MET";
-        else if (norm >= 0.6) status = "MOSTLY_MET";
-        else if (norm >= 0.4) status = "PARTIALLY_MET";
-        else status = "NOT_MET";
-      }
+        // 同題多筆（複選）→ 合併
+        // raw 聚合策略：取 max（避免同題重複、也避免平均稀釋）
+        // -1(N/A) 的處理：如果已經有非 -1，就不要被 -1 覆蓋
+        if (existing.raw === -1 && raw !== -1) {
+          existing.raw = raw;
+        } else if (existing.raw !== -1 && raw === -1) {
+          // 保留 existing.raw
+        } else {
+          existing.raw = Math.max(existing.raw, raw);
+        }
 
-      if (!axisMap[axis]) axisMap[axis] = [];
-      axisMap[axis].push({ order, questionText: text, status, isNo });
+        existing.isNo = existing.isNo || isNo;
+        // order / text 不變（同一題）
+        axisQuestionMap[axis].set(qid, existing);
+      }
+    }
+
+    // axis -> items[]
+    const axisMap: Record<
+      string,
+      { order: number; questionText: string; status: QuestionStatus; isNo: boolean }[]
+    > = {};
+
+    for (const [axis, qMap] of Object.entries(axisQuestionMap)) {
+      axisMap[axis] = [];
+
+      for (const q of qMap.values()) {
+        let status: QuestionStatus;
+
+        if (q.raw === -1) {
+          status = "NA";
+        } else {
+          const norm = q.raw / 100;
+          if (norm >= 0.8) status = "FULLY_MET";
+          else if (norm >= 0.6) status = "MOSTLY_MET";
+          else if (norm >= 0.4) status = "PARTIALLY_MET";
+          else status = "NOT_MET";
+        }
+
+        axisMap[axis].push({
+          order: q.order,
+          questionText: q.questionText,
+          status,
+          isNo: q.isNo,
+        });
+      }
     }
 
     const output: Record<string, string> = {};
@@ -134,6 +180,7 @@ export class ReportService {
     }
     return output;
   }
+
 
   /**
    * 產生 TAI Report
