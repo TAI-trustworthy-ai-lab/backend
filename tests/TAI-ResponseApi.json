@@ -1,0 +1,205 @@
+{
+  "info": {
+    "name": "TAI - Response API (Transaction & Rollback)",
+    "description": "Postman collection for Response APIs, including transaction rollback tests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3001" },
+    { "key": "token", "value": "" },
+
+    { "key": "userId", "value": "9" },
+    { "key": "projectId", "value": "5" },
+    { "key": "versionId", "value": "47" },
+
+    { "key": "questionId", "value": "64" },
+    { "key": "validOptionId", "value": "193" },
+
+    { "key": "responseId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Response - Submit Success (Commit)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/response",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "response"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": {{userId}},\n  \"projectId\": {{projectId}},\n  \"versionId\": {{versionId}},\n  \"answers\": [\n    {\n      \"questionId\": {{questionId}},\n      \"optionId\": {{validOptionId}},\n      \"value\": 5\n    }\n  ]\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Create response success (commit)\", () => {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "pm.collectionVariables.set(\"responseId\", json.data.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Response - Submit (Rollback Error Test)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/response",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "response"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": {{userId}},\n  \"projectId\": {{projectId}},\n  \"versionId\": {{versionId}},\n  \"answers\": [\n    {\n      \"questionId\": {{questionId}},\n      \"optionId\": 999999,\n      \"value\": 5\n    }\n  ]\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Validation error triggers rollback\", () => {",
+              "  pm.response.to.have.status(400);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "pm.expect(json.success).to.eql(false);",
+              "pm.expect(json.errors).to.be.an(\"array\");"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Response - Get By ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/response/id/{{responseId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "response", "id", "{{responseId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Get response by ID success\", () => {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Response - Update Success",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/response/{{responseId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "response", "{{responseId}}"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"answers\": [\n    {\n      \"questionId\": {{questionId}},\n      \"optionId\": {{validOptionId}},\n      \"value\": 4\n    }\n  ]\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Update response success\", () => {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Response - Update (Rollback Error Test)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/response/{{responseId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "response", "{{responseId}}"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"answers\": [\n    {\n      \"questionId\": {{questionId}},\n      \"optionId\": 999999,\n      \"value\": 1\n    }\n  ]\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Update validation error triggers rollback\", () => {",
+              "  pm.response.to.have.status(400);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Response - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/response/{{responseId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "response", "{{responseId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Delete response success\", () => {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

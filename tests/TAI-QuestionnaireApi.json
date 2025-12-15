@@ -1,0 +1,182 @@
+{
+  "info": {
+    "name": "TAI - Questionnaire API",
+    "description": "Postman collection for Questionnaire Admin & User APIs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3001" },
+    { "key": "adminToken", "value": "" },
+    { "key": "questionnaireId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Admin - Create Questionnaire",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/questionnaire",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "questionnaire"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"groupName\": \"建模前\",\n  \"title\": \"建模前 問卷 v1\",\n  \"description\": \"建模前問卷描述\",\n  \"questions\": [\n    {\n      \"text\": \"模型訓練資料是否足夠？\",\n      \"category\": \"ACCURACY\",\n      \"order\": 0,\n      \"type\": \"SCALE\",\n      \"options\": [\n        { \"text\": \"非常不足\", \"value\": 1, \"order\": 0 },\n        { \"text\": \"非常充足\", \"value\": 5, \"order\": 4 }\n      ]\n    }\n  ]\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Create questionnaire success\", () => {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "pm.collectionVariables.set(\"questionnaireId\", json.data.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Update Questionnaire",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/questionnaire/{{questionnaireId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "questionnaire", "{{questionnaireId}}"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"建模前 問卷 v1.1\",\n  \"isActive\": true\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Update questionnaire success\", () => {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Duplicate Questionnaire",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/questionnaire/{{questionnaireId}}/duplicate",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "questionnaire", "{{questionnaireId}}", "duplicate"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"建模前 問卷 v2\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Duplicate questionnaire success\", () => {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "User - Get Latest Questionnaire Groups",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/questionnaire/group/latest",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "questionnaire", "group", "latest"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Latest group questionnaires returned\", () => {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "User - Get Latest Questionnaire By Group",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/questionnaire/latest?groupName=建模前",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "questionnaire", "latest"],
+          "query": [
+            { "key": "groupName", "value": "建模前" }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Latest questionnaire by group returned\", () => {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "User - Get Questionnaire By Version ID",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/questionnaire/version/{{questionnaireId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "questionnaire", "version", "{{questionnaireId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Questionnaire version fetched\", () => {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
