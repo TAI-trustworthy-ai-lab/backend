@@ -87,59 +87,83 @@ export class ReportService {
    * 依 Response 建立題目統計 Markdown
    */
   buildQuestionStatsFromResponse(response: any): Record<string, string> {
-    // axis -> questionId -> aggregated question
-    const axisQuestionMap: Record<
-      string,
-      Map<number, { order: number; questionText: string; raw: number; isNo: boolean }>
-    > = {};
+    /**
+     * 這裡的目標：
+     * 1) 複選題（MULTIPLE_CHOICE）在統計中只顯示一次題目（不因勾選選項而重複列出）
+     * 2) 題目狀態/分數要以「每題」為單位聚合後再判斷
+     */
+    type Agg = {
+      axis: TAIIndicator;
+      qid: number;
+      order: number;
+      questionText: string;
+      type: string; // Prisma enum as string
+      values: number[];
+      isNo: boolean;
+      selectedOptions: Set<string>; // ✅ 新增：複選題勾到的選項文字
+    };
 
+    const aggMap = new Map<number, Agg>();
+
+    const getRaw = (a: any): number | null => {
+      if (a?.value !== undefined && a?.value !== null) return Number(a.value);
+      if (a?.option?.value !== undefined && a?.option?.value !== null) return Number(a.option.value);
+      return null;
+    };
+
+    const computeMultipleChoiceScore = (values: number[]): number => {
+      const vs = values.filter((v) => v !== null && v !== undefined && !isNaN(v));
+      if (vs.length === 0) return -1;
+
+      // 若全部都是 -1（不適用）
+      if (vs.every((v) => v === -1)) return -1;
+
+      // ✅ 需求：只要有任一個 100 被勾選，該題分數就是 100
+      if (vs.some((v) => v === 100)) return 100;
+
+      // 其他情況：排除 -1 後取最大（常見：0/50/75…）
+      const candidates = vs.filter((v) => v !== -1);
+      return candidates.length > 0 ? Math.max(...candidates) : -1;
+    };
+
+    // 先把同一題的多筆答案（複選）聚合起來
     for (const a of response.answers ?? []) {
-      // 取分數 raw
-      let raw: number | null = null;
-
-      if (a.value !== undefined && a.value !== null) {
-        raw = Number(a.value);
-      } else if (a.option?.value !== undefined && a.option?.value !== null) {
-        raw = Number(a.option.value);
-      }
-
+      const raw = getRaw(a);
       if (raw === null || isNaN(raw)) continue;
 
+      const qid = Number(a.questionId);
       const axis = a.question.category as TAIIndicator;
-      const qid = a.questionId as number; // Prisma Answer.questionId
       const order = a.question.order;
-      const text = a.question.text;
-      const optionText = (a.option?.text ?? "").trim();
+      const qText = a.question.text;
+      const qType = String(a.question.type ?? "");
 
+      const optionText = (a.option?.text ?? "").trim();
       const isNo = optionText === "否" || optionText.toLowerCase() === "no";
 
-      if (!axisQuestionMap[axis]) axisQuestionMap[axis] = new Map();
-
-      const existing = axisQuestionMap[axis].get(qid);
-
+      const existing = aggMap.get(qid);
       if (!existing) {
-        // 第一次看到這題
-        axisQuestionMap[axis].set(qid, {
+        const set = new Set<string>();
+        if (qType === "MULTIPLE_CHOICE" && optionText) set.add(optionText);
+
+        aggMap.set(qid, {
+          axis,
+          qid,
           order,
-          questionText: text,
-          raw,
+          questionText: qText,
+          type: qType,
+          values: [raw],
           isNo,
+          selectedOptions: set, // ✅
         });
       } else {
-        // 同題多筆（複選）→ 合併
-        // raw 聚合策略：取 max（避免同題重複、也避免平均稀釋）
-        // -1(N/A) 的處理：如果已經有非 -1，就不要被 -1 覆蓋
-        if (existing.raw === -1 && raw !== -1) {
-          existing.raw = raw;
-        } else if (existing.raw !== -1 && raw === -1) {
-          // 保留 existing.raw
-        } else {
-          existing.raw = Math.max(existing.raw, raw);
+        existing.values.push(raw);
+        existing.isNo = existing.isNo || isNo;
+
+        if (qType === "MULTIPLE_CHOICE" && optionText) {
+          existing.selectedOptions.add(optionText); // ✅
         }
 
-        existing.isNo = existing.isNo || isNo;
-        // order / text 不變（同一題）
-        axisQuestionMap[axis].set(qid, existing);
+        aggMap.set(qid, existing);
       }
     }
 
@@ -149,31 +173,47 @@ export class ReportService {
       { order: number; questionText: string; status: QuestionStatus; isNo: boolean }[]
     > = {};
 
-    for (const [axis, qMap] of Object.entries(axisQuestionMap)) {
-      axisMap[axis] = [];
+    // 每題算出「聚合後的 raw」，再判斷狀態
+    for (const q of aggMap.values()) {
+      const axis = q.axis;
 
-      for (const q of qMap.values()) {
-        let status: QuestionStatus;
+      if (!axisMap[axis]) axisMap[axis] = [];
 
-        if (q.raw === -1) {
-          status = "NA";
-        } else {
-          const norm = q.raw / 100;
-          if (norm >= 0.8) status = "FULLY_MET";
-          else if (norm >= 0.6) status = "MOSTLY_MET";
-          else if (norm >= 0.4) status = "PARTIALLY_MET";
-          else status = "NOT_MET";
-        }
-
-        axisMap[axis].push({
-          order: q.order,
-          questionText: q.questionText,
-          status,
-          isNo: q.isNo,
-        });
+      let rawScore: number;
+      if (q.type === "MULTIPLE_CHOICE") {
+        rawScore = computeMultipleChoiceScore(q.values);
+      } else {
+        // SINGLE_CHOICE / SCALE / TEXT：正常只會有一筆；保守處理取第一筆
+        rawScore = q.values[0] ?? -1;
       }
+
+      let status: QuestionStatus;
+      if (rawScore === -1) {
+        status = "NA";
+      } else {
+        const norm = rawScore / 100;
+        if (norm >= 0.8) status = "FULLY_MET";
+        else if (norm >= 0.6) status = "MOSTLY_MET";
+        else if (norm >= 0.4) status = "PARTIALLY_MET";
+        else status = "NOT_MET";
+      }
+
+      let finalText = q.questionText;
+
+      if (q.type === "MULTIPLE_CHOICE") {
+        const tags = [...q.selectedOptions].map(t => `【${t}】`).join("");
+        finalText = `${finalText} ${tags}`.trim();
+      }
+
+      axisMap[axis].push({
+        order: q.order,
+        questionText: finalText, // ✅ 用拼好的
+        status,
+        isNo: q.isNo,
+      });
     }
 
+    // 輸出：每個 axis 一段 markdown
     const output: Record<string, string> = {};
     for (const [axis, items] of Object.entries(axisMap)) {
       output[axis] = buildAxisStatsText(axis, items);
@@ -197,29 +237,53 @@ export class ReportService {
     if (!response) throw new Error("Response not found");
 
     // ----------------------------------------------------
-    // 1) 整理答案給 computeTAIScores
+    // 1) 整理答案給 computeTAIScores（⚠️ 以「每題」為單位聚合，避免複選題被重複計入）
     // ----------------------------------------------------
-    const cleanedAnswers: { axis: TAIIndicator; value: number }[] =
-      response.answers
-        .map((a) => {
-          let score: number | null = null;
+    const questionAgg = new Map<
+      number,
+      { axis: TAIIndicator; type: string; values: number[] }
+    >();
 
-          if (a.value !== null && a.value !== undefined) {
-            score = Number(a.value);
-          } else if (a.option?.value !== null && a.option?.value !== undefined) {
-            score = Number(a.option.value);
-          }
+    const getRaw = (a: any): number | null => {
+      if (a?.value !== undefined && a?.value !== null) return Number(a.value);
+      if (a?.option?.value !== undefined && a?.option?.value !== null) return Number(a.option.value);
+      return null;
+    };
 
-          if (score === null) return null;
+    const computeMultipleChoiceScore = (values: number[]): number => {
+      const vs = values.filter((v) => v !== null && v !== undefined && !isNaN(v));
+      if (vs.length === 0) return -1;
+      if (vs.every((v) => v === -1)) return -1;
+      if (vs.some((v) => v === 100)) return 100; // ✅ 需求：有任一個 100 即 100
+      const candidates = vs.filter((v) => v !== -1);
+      return candidates.length > 0 ? Math.max(...candidates) : -1;
+    };
 
-          return {
-            axis: a.question.category as TAIIndicator,
-            value: score,
-          };
-        })
-        .filter(
-          (x): x is { axis: TAIIndicator; value: number } => x !== null
-        );
+    for (const a of response.answers ?? []) {
+      const raw = getRaw(a);
+      if (raw === null || isNaN(raw)) continue;
+
+      const qid = Number(a.questionId);
+      const axis = a.question.category as TAIIndicator;
+      const qType = String(a.question.type ?? "");
+
+      const existing = questionAgg.get(qid);
+      if (!existing) {
+        questionAgg.set(qid, { axis, type: qType, values: [raw] });
+      } else {
+        existing.values.push(raw);
+        questionAgg.set(qid, existing);
+      }
+    }
+
+    const cleanedAnswers: { axis: TAIIndicator; value: number }[] = [];
+    for (const q of questionAgg.values()) {
+      let score: number;
+      if (q.type === "MULTIPLE_CHOICE") score = computeMultipleChoiceScore(q.values);
+      else score = q.values[0] ?? -1;
+
+      cleanedAnswers.push({ axis: q.axis, value: score });
+    }
 
     // 2) 計算 TAI 分數（0–1 或 -1）
     const taiScores = computeTAIScores(cleanedAnswers);
