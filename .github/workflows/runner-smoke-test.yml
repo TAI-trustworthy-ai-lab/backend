@@ -1,0 +1,17 @@
+name: Runner Smoke Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: self-hosted
+    steps:
+      - name: Show system info
+        run: |
+          whoami
+          hostname
+          pwd
+          date
+          node -v || true
+          pm2 -v || true
