@@ -57,7 +57,7 @@ jobs:
 
           docker pull "$IMAGE_NAME"
 
-          docker network create automate-gamsys-network || true
+          docker network create project-network || true
 
           docker compose -f docker-compose.prod.yml up -d
           docker compose -f docker-compose.prod.yml ps
