@@ -59,5 +59,6 @@ jobs:
 
           docker network create project-network || true
 
+          docker compose -f docker-compose.prod.yml down || true
           docker compose -f docker-compose.prod.yml up -d
           docker compose -f docker-compose.prod.yml ps
